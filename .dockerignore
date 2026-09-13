@@ -1,0 +1,10 @@
+.git
+.gitignore
+.dart_tool/
+.idea/
+build/
+.metadata
+*.iml
+linux/
+windows/
+macos/
