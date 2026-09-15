@@ -207,7 +207,7 @@ class _SchedulesTabState extends State<SchedulesTab> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceHighlight.withOpacity(0.4),
+                color: AppTheme.surfaceHighlight.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.surfaceHighlight),
               ),

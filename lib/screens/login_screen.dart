@@ -5,7 +5,6 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/totp_service.dart';
 import '../theme/app_theme.dart';
-import '../models/user_account.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
@@ -177,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 border: Border.all(color: AppTheme.surfaceHighlight),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withValues(alpha: 0.4),
                     blurRadius: 28,
                     offset: const Offset(0, 12),
                   ),
@@ -203,9 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.12),
+              color: AppTheme.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.primary.withOpacity(0.3), width: 2),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3), width: 2),
             ),
             child: const Icon(
               Icons.shield_outlined,
@@ -266,8 +265,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? AppTheme.primary.withOpacity(0.18)
-                        : AppTheme.surfaceHighlight.withOpacity(0.5),
+                        ? AppTheme.primary.withValues(alpha: 0.18)
+                        : AppTheme.surfaceHighlight.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected ? AppTheme.primary : Colors.transparent,
@@ -381,9 +380,9 @@ class _LoginScreenState extends State<LoginScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.redAccent.withOpacity(0.12),
+              color: Colors.redAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
             ),
             child: Row(
               children: [
@@ -712,9 +711,9 @@ class _LoginScreenState extends State<LoginScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.redAccent.withOpacity(0.12),
+              color: Colors.redAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
             ),
             child: Row(
               children: [

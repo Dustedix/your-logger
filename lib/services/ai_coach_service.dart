@@ -132,15 +132,13 @@ Tone: Energetic, encouraging, scientific, direct, and concise. Use bold text for
         '- Date: ${dateFormat.format(log.completedDate)} | Routine: "${log.scheduleTitle}" | Duration: ${log.durationMinutes} min | Volume: ${log.totalVolumeKg.toStringAsFixed(1)} kg | Sets: ${log.totalCompletedSets} | Reps: ${log.totalCompletedReps}',
       );
       for (final ex in log.exerciseLogs) {
-        final setsSummary = ex.sets.map((s) {
-          if (s.timeSeconds != null && s.timeSeconds! > 0) {
-            return '${s.timeSeconds}s${s.weightKg > 0 ? " (+${s.weightKg}kg)" : ""}';
-          }
-          return '${s.reps}x${s.weightKg}kg';
-        }).join(', ');
-        buffer.writeln('    * ${ex.exerciseName} (${ex.targetMuscle}): $setsSummary');
+        final setsSummary = ex.sets.map((s) => ex.formatSetText(s)).join(', ');
+        final title = ex.isSuperset && (ex.supersetName?.isNotEmpty ?? false)
+            ? '⚡ Superset: ${ex.exerciseName} (${ex.targetMuscle}) + ${ex.supersetName} (${ex.supersetTargetMuscle ?? "General"})'
+            : '${ex.exerciseName} (${ex.targetMuscle})';
+        buffer.writeln('    * $title: $setsSummary');
       }
-      if (log.overallNotes != null && log.overallNotes!.isNotEmpty) {
+      if (log.overallNotes.isNotEmpty) {
         buffer.writeln('    * Notes: "${log.overallNotes}"');
       }
     }

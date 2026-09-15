@@ -265,7 +265,7 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                             fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: selectedExp,
+                      initialValue: selectedExp,
                       dropdownColor: AppTheme.surfaceDark,
                       items: const [
                         DropdownMenuItem(
