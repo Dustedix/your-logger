@@ -140,17 +140,31 @@ class _HistoryCardState extends State<HistoryCard> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                exLog.exerciseName,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textPrimary,
+                              if (exLog.isSuperset) ...[
+                                const Icon(Icons.bolt,
+                                    size: 14, color: AppTheme.accentAmber),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  exLog.isSuperset
+                                      ? '${exLog.exerciseName} + ${exLog.supersetName?.isNotEmpty == true ? exLog.supersetName : "Movement 2"}'
+                                      : exLog.exerciseName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: exLog.isSuperset
+                                        ? AppTheme.accentAmber
+                                        : AppTheme.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                exLog.targetMuscle,
+                                exLog.isSuperset
+                                    ? '${exLog.targetMuscle} / ${exLog.supersetTargetMuscle ?? "General"}'
+                                    : exLog.targetMuscle,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.secondary,

@@ -5,12 +5,20 @@ class ExerciseSetLog {
   double weightKg;
   bool completed;
 
+  // Superset paired exercise metrics
+  int supersetReps;
+  int supersetTimeSeconds;
+  double supersetWeightKg;
+
   ExerciseSetLog({
     required this.setNumber,
     this.reps = 10,
     this.timeSeconds = 60,
     this.weightKg = 0.0,
     this.completed = true,
+    this.supersetReps = 10,
+    this.supersetTimeSeconds = 60,
+    this.supersetWeightKg = 0.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -19,6 +27,9 @@ class ExerciseSetLog {
         'timeSeconds': timeSeconds,
         'weightKg': weightKg,
         'completed': completed,
+        'supersetReps': supersetReps,
+        'supersetTimeSeconds': supersetTimeSeconds,
+        'supersetWeightKg': supersetWeightKg,
       };
 
   factory ExerciseSetLog.fromJson(Map<String, dynamic> json) => ExerciseSetLog(
@@ -27,6 +38,11 @@ class ExerciseSetLog {
         timeSeconds: (json['timeSeconds'] as num?)?.toInt() ?? 60,
         weightKg: (json['weightKg'] as num?)?.toDouble() ?? 0.0,
         completed: json['completed'] as bool? ?? true,
+        supersetReps: (json['supersetReps'] as num?)?.toInt() ?? 10,
+        supersetTimeSeconds:
+            (json['supersetTimeSeconds'] as num?)?.toInt() ?? 60,
+        supersetWeightKg:
+            (json['supersetWeightKg'] as num?)?.toDouble() ?? 0.0,
       );
 
   ExerciseSetLog copy() => ExerciseSetLog(
@@ -35,6 +51,9 @@ class ExerciseSetLog {
         timeSeconds: timeSeconds,
         weightKg: weightKg,
         completed: completed,
+        supersetReps: supersetReps,
+        supersetTimeSeconds: supersetTimeSeconds,
+        supersetWeightKg: supersetWeightKg,
       );
 }
 
@@ -46,6 +65,12 @@ class ExerciseCompletionLog {
   final List<ExerciseSetLog> sets;
   final String notes;
 
+  // Superset fields
+  final bool isSuperset;
+  final String? supersetName;
+  final String? supersetTargetMuscle;
+  final bool supersetIsTimeBased;
+
   ExerciseCompletionLog({
     required this.exerciseId,
     required this.exerciseName,
@@ -53,36 +78,74 @@ class ExerciseCompletionLog {
     this.isTimeBased = false,
     required this.sets,
     this.notes = '',
+    this.isSuperset = false,
+    this.supersetName,
+    this.supersetTargetMuscle,
+    this.supersetIsTimeBased = false,
   });
 
-  int get totalReps => sets.fold(
-      0, (sum, s) => sum + (s.completed && !isTimeBased ? s.reps : 0));
+  int get totalReps => sets.fold(0, (sum, s) {
+        if (!s.completed) return sum;
+        int count = !isTimeBased ? s.reps : 0;
+        if (isSuperset && !supersetIsTimeBased) {
+          count += s.supersetReps;
+        }
+        return sum + count;
+      });
 
-  int get totalTimeSeconds => sets.fold(
-      0, (sum, s) => sum + (s.completed && isTimeBased ? s.timeSeconds : 0));
+  int get totalTimeSeconds => sets.fold(0, (sum, s) {
+        if (!s.completed) return sum;
+        int count = isTimeBased ? s.timeSeconds : 0;
+        if (isSuperset && supersetIsTimeBased) {
+          count += s.supersetTimeSeconds;
+        }
+        return sum + count;
+      });
 
   int get completedSets => sets.where((s) => s.completed).length;
 
-  double get totalVolume => sets.fold(
-      0.0, (sum, s) => sum + (s.completed ? (s.reps * s.weightKg) : 0.0));
+  double get totalVolume => sets.fold(0.0, (sum, s) {
+        if (!s.completed) return sum;
+        double v = !isTimeBased ? (s.reps * s.weightKg) : 0.0;
+        if (isSuperset && !supersetIsTimeBased) {
+          v += (s.supersetReps * s.supersetWeightKg);
+        }
+        return sum + v;
+      });
 
   String formatSetText(ExerciseSetLog s) {
+    String partA;
     if (isTimeBased) {
       final sec = s.timeSeconds;
-      String timeStr;
-      if (sec >= 60) {
-        final m = sec ~/ 60;
-        final rem = sec % 60;
-        timeStr = rem > 0 ? '${m}m ${rem}s' : '${m}m';
-      } else {
-        timeStr = '${sec}s';
-      }
+      final timeStr = sec >= 60
+          ? '${sec ~/ 60}m${sec % 60 > 0 ? " ${sec % 60}s" : ""}'
+          : '${sec}s';
       final weightStr = s.weightKg > 0 ? ' (+${s.weightKg}kg)' : '';
-      return '$timeStr$weightStr';
+      partA = '$timeStr$weightStr';
     } else {
       final weightStr = s.weightKg > 0 ? ' @ ${s.weightKg}kg' : '';
-      return '${s.reps} reps$weightStr';
+      partA = '${s.reps} reps$weightStr';
     }
+
+    if (isSuperset && supersetName != null && supersetName!.isNotEmpty) {
+      String partB;
+      if (supersetIsTimeBased) {
+        final sec = s.supersetTimeSeconds;
+        final timeStr = sec >= 60
+            ? '${sec ~/ 60}m${sec % 60 > 0 ? " ${sec % 60}s" : ""}'
+            : '${sec}s';
+        final weightStr =
+            s.supersetWeightKg > 0 ? ' (+${s.supersetWeightKg}kg)' : '';
+        partB = '$timeStr$weightStr';
+      } else {
+        final weightStr =
+            s.supersetWeightKg > 0 ? ' @ ${s.supersetWeightKg}kg' : '';
+        partB = '${s.supersetReps} reps$weightStr';
+      }
+      return '$partA + $partB';
+    }
+
+    return partA;
   }
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +155,10 @@ class ExerciseCompletionLog {
         'isTimeBased': isTimeBased,
         'sets': sets.map((s) => s.toJson()).toList(),
         'notes': notes,
+        'isSuperset': isSuperset,
+        'supersetName': supersetName,
+        'supersetTargetMuscle': supersetTargetMuscle,
+        'supersetIsTimeBased': supersetIsTimeBased,
       };
 
   factory ExerciseCompletionLog.fromJson(Map<String, dynamic> json) =>
@@ -105,6 +172,10 @@ class ExerciseCompletionLog {
                 .toList() ??
             [],
         notes: json['notes'] as String? ?? '',
+        isSuperset: json['isSuperset'] as bool? ?? false,
+        supersetName: json['supersetName'] as String?,
+        supersetTargetMuscle: json['supersetTargetMuscle'] as String?,
+        supersetIsTimeBased: json['supersetIsTimeBased'] as bool? ?? false,
       );
 }
 

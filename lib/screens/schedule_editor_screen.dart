@@ -77,6 +77,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   }
 
   void _showAddExerciseDialog({Exercise? existing, int? editIndex}) {
+    bool isSuperset = existing?.isSuperset ?? false;
+
+    // Movement A controllers
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final muscleCtrl =
         TextEditingController(text: existing?.targetMuscle ?? 'General');
@@ -90,214 +93,461 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
         text: (existing?.defaultWeightKg ?? 0.0).toString());
     bool isTimeBased = existing?.isTimeBased ?? false;
 
+    // Movement B (Superset) controllers
+    final supersetNameCtrl =
+        TextEditingController(text: existing?.supersetName ?? '');
+    final supersetMuscleCtrl = TextEditingController(
+        text: existing?.supersetTargetMuscle ?? 'General');
+    final supersetRepsCtrl = TextEditingController(
+        text: (existing?.supersetReps ?? 10).toString());
+    final supersetTimeCtrl = TextEditingController(
+        text: (existing?.supersetTimeSeconds ?? 60).toString());
+    final supersetWeightCtrl = TextEditingController(
+        text: (existing?.supersetWeightKg ?? 0.0).toString());
+    bool supersetIsTimeBased = existing?.supersetIsTimeBased ?? false;
+
     showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(existing == null ? 'Add Exercise' : 'Edit Exercise'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Exercise Name',
-                        hintText: 'e.g. Plank, Bench Press, Wall Sit',
+              title: Row(
+                children: [
+                  Icon(
+                    isSuperset ? Icons.bolt : Icons.fitness_center,
+                    color: isSuperset ? AppTheme.accentAmber : AppTheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(existing == null ? 'Add Exercise' : 'Edit Exercise'),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Mode Switcher: Normal vs Superset
+                      const Text(
+                        'Workout Structure',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
-                      onChanged: (val) {
-                        // Helpful auto-suggestion for Plank / Wall Sit
-                        final lower = val.toLowerCase();
-                        if ((lower.contains('plank') ||
-                                lower.contains('wall sit') ||
-                                lower.contains('hold')) &&
-                            !isTimeBased) {
-                          setDialogState(() {
-                            isTimeBased = true;
-                            if (muscleCtrl.text == 'General') {
-                              muscleCtrl.text = 'Core';
-                            }
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: muscleCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Target Muscle',
-                        hintText: 'e.g. Core, Chest, Legs',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Exercise Type Selector: Reps vs Timed
-                    const Text(
-                      'Tracking Mode',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setDialogState(() => isTimeBased = false),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: !isTimeBased
-                                    ? AppTheme.primary.withValues(alpha: 0.2)
-                                    : AppTheme.surfaceLighter,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: !isTimeBased
-                                      ? AppTheme.primary
-                                      : AppTheme.surfaceHighlight,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setDialogState(() => isSuperset = false),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: !isSuperset
+                                      ? AppTheme.primary.withValues(alpha: 0.2)
+                                      : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: !isSuperset
+                                        ? AppTheme.primary
+                                        : AppTheme.surfaceHighlight,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.fitness_center,
+                                        size: 15,
+                                        color: !isSuperset
+                                            ? AppTheme.primary
+                                            : AppTheme.textMuted),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Normal',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: !isSuperset
+                                            ? AppTheme.primary
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.repeat,
-                                      size: 16,
-                                      color: !isTimeBased
-                                          ? AppTheme.primary
-                                          : AppTheme.textMuted),
-                                  const SizedBox(width: 6),
-                                  Text(
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setDialogState(() => isSuperset = true),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isSuperset
+                                      ? AppTheme.accentAmber.withValues(alpha: 0.2)
+                                      : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isSuperset
+                                        ? AppTheme.accentAmber
+                                        : AppTheme.surfaceHighlight,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.bolt,
+                                        size: 16,
+                                        color: isSuperset
+                                            ? AppTheme.accentAmber
+                                            : AppTheme.textMuted),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '⚡ Superset (Pair)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSuperset
+                                            ? AppTheme.accentAmber
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Section Header for Movement A
+                      if (isSuperset) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'MOVEMENT 1 (PRIMARY)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: isSuperset
+                              ? 'Movement 1 Name'
+                              : 'Exercise Name',
+                          hintText: isSuperset
+                              ? 'e.g. Bicep Curls'
+                              : 'e.g. Plank, Bench Press, Squats',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: muscleCtrl,
+                        decoration: InputDecoration(
+                          labelText: isSuperset
+                              ? 'Movement 1 Target Muscle'
+                              : 'Target Muscle',
+                          hintText: 'e.g. Chest, Biceps, Core',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Movement 1 Type Selector: Reps vs Timed
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () =>
+                                  setDialogState(() => isTimeBased = false),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: !isTimeBased
+                                      ? AppTheme.primary.withValues(alpha: 0.15)
+                                      : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: !isTimeBased
+                                        ? AppTheme.primary
+                                        : AppTheme.surfaceHighlight,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
                                     'Reps & Sets',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: !isTimeBased
                                           ? AppTheme.primary
                                           : AppTheme.textSecondary,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setDialogState(() => isTimeBased = true),
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isTimeBased
-                                    ? AppTheme.secondary.withValues(alpha: 0.2)
-                                    : AppTheme.surfaceLighter,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () =>
+                                  setDialogState(() => isTimeBased = true),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
                                   color: isTimeBased
-                                      ? AppTheme.secondary
-                                      : AppTheme.surfaceHighlight,
+                                      ? AppTheme.secondary.withValues(alpha: 0.15)
+                                      : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isTimeBased
+                                        ? AppTheme.secondary
+                                        : AppTheme.surfaceHighlight,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.timer,
-                                      size: 16,
-                                      color: isTimeBased
-                                          ? AppTheme.secondary
-                                          : AppTheme.textMuted),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Timed (Plank)',
+                                child: Center(
+                                  child: Text(
+                                    'Timed Hold',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: isTimeBased
                                           ? AppTheme.secondary
                                           : AppTheme.textSecondary,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    // Sets and Reps/Duration
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: setsCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration:
-                                const InputDecoration(labelText: 'Sets'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (!isTimeBased)
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
                           Expanded(
                             child: TextField(
-                              controller: repsCtrl,
+                              controller: isTimeBased ? timeCtrl : repsCtrl,
                               keyboardType: TextInputType.number,
-                              decoration:
-                                  const InputDecoration(labelText: 'Reps/Set'),
+                              decoration: InputDecoration(
+                                labelText: isTimeBased ? 'Hold (s)' : 'Reps',
+                              ),
                             ),
-                          )
-                        else
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: TextField(
-                              controller: timeCtrl,
-                              keyboardType: TextInputType.number,
+                              controller: weightCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true),
                               decoration: const InputDecoration(
-                                labelText: 'Seconds',
-                                suffixText: 'sec',
+                                labelText: 'Weight (kg)',
                               ),
                             ),
                           ),
+                        ],
+                      ),
+
+                      // If Superset is enabled: MOVEMENT 2 SECTION
+                      if (isSuperset) ...[
+                        const SizedBox(height: 18),
+                        const Divider(
+                            height: 1, color: AppTheme.surfaceHighlight),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentAmber.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.bolt,
+                                  size: 13, color: AppTheme.accentAmber),
+                              SizedBox(width: 4),
+                              Text(
+                                'MOVEMENT 2 (BACK-TO-BACK)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.accentAmber,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: supersetNameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Movement 2 Name',
+                            hintText: 'e.g. Triceps Pushdowns',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: supersetMuscleCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Movement 2 Target Muscle',
+                            hintText: 'e.g. Triceps',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Movement 2 Type Selector
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setDialogState(
+                                    () => supersetIsTimeBased = false),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: !supersetIsTimeBased
+                                        ? AppTheme.accentAmber
+                                            .withValues(alpha: 0.15)
+                                        : AppTheme.surfaceLighter,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: !supersetIsTimeBased
+                                          ? AppTheme.accentAmber
+                                          : AppTheme.surfaceHighlight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Reps & Sets',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: !supersetIsTimeBased
+                                            ? AppTheme.accentAmber
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setDialogState(
+                                    () => supersetIsTimeBased = true),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: supersetIsTimeBased
+                                        ? AppTheme.secondary
+                                            .withValues(alpha: 0.15)
+                                        : AppTheme.surfaceLighter,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: supersetIsTimeBased
+                                          ? AppTheme.secondary
+                                          : AppTheme.surfaceHighlight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Timed Hold',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: supersetIsTimeBased
+                                            ? AppTheme.secondary
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: supersetIsTimeBased
+                                    ? supersetTimeCtrl
+                                    : supersetRepsCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: supersetIsTimeBased
+                                      ? 'Hold (s)'
+                                      : 'Reps',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: supersetWeightCtrl,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Weight (kg)',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
-                    ),
-                    if (isTimeBased) ...[
-                      const SizedBox(height: 8),
-                      // Quick duration presets
-                      Wrap(
-                        spacing: 6,
-                        children: [30, 45, 60, 90, 120].map((sec) {
-                          return ActionChip(
-                            label: Text('${sec}s'),
-                            padding: EdgeInsets.zero,
-                            labelStyle: const TextStyle(fontSize: 11),
-                            backgroundColor: AppTheme.surfaceLighter,
-                            onPressed: () {
-                              setDialogState(() {
-                                timeCtrl.text = sec.toString();
-                              });
-                            },
-                          );
-                        }).toList(),
+
+                      const SizedBox(height: 18),
+                      const Divider(
+                          height: 1, color: AppTheme.surfaceHighlight),
+                      const SizedBox(height: 14),
+
+                      // Shared Total Sets
+                      TextField(
+                        controller: setsCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: isSuperset
+                              ? 'Total Superset Rounds / Sets'
+                              : 'Total Sets',
+                          hintText: '3',
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: weightCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: isTimeBased
-                            ? 'Extra Weight (Optional, kg)'
-                            : 'Weight (kg/lbs)',
-                        hintText: '0',
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               actions: [
@@ -306,9 +556,16 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isSuperset
+                        ? AppTheme.accentAmber
+                        : AppTheme.primary,
+                    foregroundColor: AppTheme.bgDark,
+                  ),
                   onPressed: () {
                     final name = nameCtrl.text.trim();
                     if (name.isEmpty) return;
+
                     final sets = int.tryParse(setsCtrl.text) ?? 3;
                     final reps = int.tryParse(repsCtrl.text) ?? 10;
                     final time = int.tryParse(timeCtrl.text) ?? 60;
@@ -316,6 +573,16 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     final muscle = muscleCtrl.text.trim().isEmpty
                         ? 'General'
                         : muscleCtrl.text.trim();
+
+                    // Superset data
+                    final sName = supersetNameCtrl.text.trim();
+                    final sMuscle = supersetMuscleCtrl.text.trim().isEmpty
+                        ? 'General'
+                        : supersetMuscleCtrl.text.trim();
+                    final sReps = int.tryParse(supersetRepsCtrl.text) ?? 10;
+                    final sTime = int.tryParse(supersetTimeCtrl.text) ?? 60;
+                    final sWeight =
+                        double.tryParse(supersetWeightCtrl.text) ?? 0.0;
 
                     setState(() {
                       final newEx = Exercise(
@@ -327,7 +594,15 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         defaultReps: reps,
                         defaultTimeSeconds: time,
                         defaultWeightKg: weight,
+                        isSuperset: isSuperset,
+                        supersetName: isSuperset ? sName : null,
+                        supersetTargetMuscle: isSuperset ? sMuscle : null,
+                        supersetIsTimeBased: supersetIsTimeBased,
+                        supersetReps: sReps,
+                        supersetTimeSeconds: sTime,
+                        supersetWeightKg: sWeight,
                       );
+
                       if (editIndex != null) {
                         _exercises[editIndex] = newEx;
                       } else {
@@ -336,7 +611,10 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     });
                     Navigator.pop(ctx);
                   },
-                  child: const Text('Save Exercise'),
+                  child: Text(
+                    isSuperset ? 'Save Superset' : 'Save Exercise',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             );
@@ -586,17 +864,25 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: ex.isTimeBased
-                                ? AppTheme.secondary.withValues(alpha: 0.15)
-                                : AppTheme.primary.withValues(alpha: 0.15),
+                            color: ex.isSuperset
+                                ? AppTheme.accentAmber.withValues(alpha: 0.18)
+                                : (ex.isTimeBased
+                                    ? AppTheme.secondary.withValues(alpha: 0.15)
+                                    : AppTheme.primary.withValues(alpha: 0.15)),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Icon(
-                            ex.isTimeBased ? Icons.timer : Icons.fitness_center,
+                            ex.isSuperset
+                                ? Icons.bolt
+                                : (ex.isTimeBased
+                                    ? Icons.timer
+                                    : Icons.fitness_center),
                             size: 16,
-                            color: ex.isTimeBased
-                                ? AppTheme.secondary
-                                : AppTheme.primary,
+                            color: ex.isSuperset
+                                ? AppTheme.accentAmber
+                                : (ex.isTimeBased
+                                    ? AppTheme.secondary
+                                    : AppTheme.primary),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -604,19 +890,55 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                ex.name,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      ex.isSuperset
+                                          ? '${ex.name} + ${ex.supersetName?.isNotEmpty == true ? ex.supersetName : "Movement 2"}'
+                                          : ex.name,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: ex.isSuperset
+                                            ? AppTheme.accentAmber
+                                            : AppTheme.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (ex.isSuperset) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentAmber
+                                            .withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                            color: AppTheme.accentAmber
+                                                .withValues(alpha: 0.4)),
+                                      ),
+                                      child: const Text(
+                                        'SUPERSET',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.accentAmber,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                ex.isTimeBased
-                                    ? '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultTimeSeconds}s hold ${ex.defaultWeightKg > 0 ? '(+${ex.defaultWeightKg}kg)' : ''}'
-                                    : '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultReps} reps • ${ex.defaultWeightKg}kg',
+                                ex.isSuperset
+                                    ? '${ex.defaultSets} rounds • 1: ${ex.targetMuscle} (${ex.isTimeBased ? "${ex.defaultTimeSeconds}s" : "${ex.defaultReps}r"}${ex.defaultWeightKg > 0 ? " @ ${ex.defaultWeightKg}kg" : ""}) + 2: ${ex.supersetTargetMuscle ?? "General"} (${ex.supersetIsTimeBased ? "${ex.supersetTimeSeconds ?? 60}s" : "${ex.supersetReps ?? 10}r"}${(ex.supersetWeightKg ?? 0) > 0 ? " @ ${ex.supersetWeightKg}kg" : ""})'
+                                    : (ex.isTimeBased
+                                        ? '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultTimeSeconds}s hold ${ex.defaultWeightKg > 0 ? '(+${ex.defaultWeightKg}kg)' : ''}'
+                                        : '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultReps} reps • ${ex.defaultWeightKg}kg'),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.textMuted,

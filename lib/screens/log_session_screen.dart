@@ -60,6 +60,40 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     return ctrl;
   }
 
+  TextEditingController _getSuperWeightCtrl(int exIdx, int setIdx, double val) {
+    final k = 'sw_${exIdx}_$setIdx';
+    var ctrl = _controllers[k];
+    if (ctrl == null) {
+      ctrl = TextEditingController(
+        text: val == 0
+            ? '0'
+            : (val % 1 == 0 ? val.toInt().toString() : val.toString()),
+      );
+      _controllers[k] = ctrl;
+    }
+    return ctrl;
+  }
+
+  TextEditingController _getSuperRepsCtrl(int exIdx, int setIdx, int val) {
+    final k = 'sr_${exIdx}_$setIdx';
+    var ctrl = _controllers[k];
+    if (ctrl == null) {
+      ctrl = TextEditingController(text: val.toString());
+      _controllers[k] = ctrl;
+    }
+    return ctrl;
+  }
+
+  TextEditingController _getSuperTimeCtrl(int exIdx, int setIdx, int val) {
+    final k = 'st_${exIdx}_$setIdx';
+    var ctrl = _controllers[k];
+    if (ctrl == null) {
+      ctrl = TextEditingController(text: '${val}s');
+      _controllers[k] = ctrl;
+    }
+    return ctrl;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +104,10 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
         exerciseName: exercise.name,
         targetMuscle: exercise.targetMuscle,
         isTimeBased: exercise.isTimeBased,
+        isSuperset: exercise.isSuperset,
+        supersetName: exercise.supersetName,
+        supersetTargetMuscle: exercise.supersetTargetMuscle,
+        supersetIsTimeBased: exercise.supersetIsTimeBased,
         sets: List.generate(
           exercise.defaultSets > 0 ? exercise.defaultSets : 3,
           (index) => ExerciseSetLog(
@@ -80,6 +118,13 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                 : 60,
             weightKg: exercise.defaultWeightKg,
             completed: true,
+            supersetReps: (exercise.supersetReps ?? 0) > 0
+                ? exercise.supersetReps!
+                : 10,
+            supersetTimeSeconds: (exercise.supersetTimeSeconds ?? 0) > 0
+                ? exercise.supersetTimeSeconds!
+                : 60,
+            supersetWeightKg: exercise.supersetWeightKg ?? 0.0,
           ),
         ),
       );
@@ -131,6 +176,12 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           currentSets.isNotEmpty ? currentSets.last.timeSeconds : 60;
       final lastWeight =
           currentSets.isNotEmpty ? currentSets.last.weightKg : 0.0;
+      final lastSuperReps =
+          currentSets.isNotEmpty ? currentSets.last.supersetReps : 10;
+      final lastSuperTime =
+          currentSets.isNotEmpty ? currentSets.last.supersetTimeSeconds : 60;
+      final lastSuperWeight =
+          currentSets.isNotEmpty ? currentSets.last.supersetWeightKg : 0.0;
       currentSets.add(
         ExerciseSetLog(
           setNumber: currentSets.length + 1,
@@ -138,6 +189,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           timeSeconds: lastTime,
           weightKg: lastWeight,
           completed: true,
+          supersetReps: lastSuperReps,
+          supersetTimeSeconds: lastSuperTime,
+          supersetWeightKg: lastSuperWeight,
         ),
       );
     });
@@ -599,9 +653,405 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     );
   }
 
+  Widget _buildMovementMiniInputs({
+    required bool isTime,
+    required double weight,
+    required TextEditingController weightCtrl,
+    required int reps,
+    required TextEditingController repsCtrl,
+    required int timeSeconds,
+    required TextEditingController timeCtrl,
+    required ValueChanged<double> onWeightChanged,
+    required ValueChanged<int> onRepsChanged,
+    required ValueChanged<int> onTimeChanged,
+    required Color color,
+    required String movementTitle,
+    required int exerciseIndex,
+    required int setIndex,
+    required ExerciseSetLog set,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Weight Stepper Box
+        Container(
+          width: 82,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceLighter,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.surfaceHighlight),
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: weight >= 2.5
+                    ? () {
+                        final nw = (weight - 2.5).clamp(0.0, 999.0);
+                        onWeightChanged(nw);
+                        weightCtrl.text = nw == 0
+                            ? '0'
+                            : (nw % 1 == 0
+                                ? nw.toInt().toString()
+                                : nw.toStringAsFixed(1));
+                      }
+                    : null,
+                child: const SizedBox(
+                  width: 20,
+                  height: 34,
+                  child: Icon(Icons.remove,
+                      size: 12, color: AppTheme.textSecondary),
+                ),
+              ),
+              Expanded(
+                child: TextFormField(
+                  controller: weightCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    suffixText: 'k',
+                    suffixStyle:
+                        TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                  ),
+                  onChanged: (val) {
+                    final p = double.tryParse(val);
+                    if (p != null) onWeightChanged(p);
+                  },
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  final nw = weight + 2.5;
+                  onWeightChanged(nw);
+                  weightCtrl.text = nw % 1 == 0
+                      ? nw.toInt().toString()
+                      : nw.toStringAsFixed(1);
+                },
+                child: const SizedBox(
+                  width: 20,
+                  height: 34,
+                  child: Icon(Icons.add,
+                      size: 12, color: AppTheme.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        // Reps / Timed Hold Stepper Box
+        Container(
+          width: 82,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceLighter,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.surfaceHighlight),
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: isTime
+                    ? (timeSeconds >= 10
+                        ? () {
+                            final nt = (timeSeconds - 5).clamp(5, 3600);
+                            onTimeChanged(nt);
+                            timeCtrl.text = '${nt}s';
+                          }
+                        : null)
+                    : (reps > 1
+                        ? () {
+                            final nr = reps - 1;
+                            onRepsChanged(nr);
+                            repsCtrl.text = nr.toString();
+                          }
+                        : null),
+                child: const SizedBox(
+                  width: 20,
+                  height: 34,
+                  child: Icon(Icons.remove,
+                      size: 12, color: AppTheme.textSecondary),
+                ),
+              ),
+              Expanded(
+                child: TextFormField(
+                  controller: isTime ? timeCtrl : repsCtrl,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    suffixText: isTime ? '' : 'r',
+                    suffixStyle:
+                        const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                  ),
+                  onChanged: (val) {
+                    if (isTime) {
+                      final cleaned = val.replaceAll(RegExp(r'[^0-9]'), '');
+                      final p = int.tryParse(cleaned);
+                      if (p != null && p > 0) onTimeChanged(p);
+                    } else {
+                      final p = int.tryParse(val);
+                      if (p != null && p > 0) onRepsChanged(p);
+                    }
+                  },
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  if (isTime) {
+                    final nt = timeSeconds + 5;
+                    onTimeChanged(nt);
+                    timeCtrl.text = '${nt}s';
+                  } else {
+                    final nr = reps + 1;
+                    onRepsChanged(nr);
+                    repsCtrl.text = nr.toString();
+                  }
+                },
+                child: const SizedBox(
+                  width: 20,
+                  height: 34,
+                  child: Icon(Icons.add,
+                      size: 12, color: AppTheme.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSupersetRow(
+      int exerciseIndex, int setIndex, ExerciseSetLog set) {
+    final exerciseLog = _exerciseLogs[exerciseIndex];
+    final isTime1 = exerciseLog.isTimeBased;
+    final isTime2 = exerciseLog.supersetIsTimeBased;
+
+    final wCtrl1 = _getWeightCtrl(exerciseIndex, setIndex, set.weightKg);
+    final rCtrl1 = _getRepsCtrl(exerciseIndex, setIndex, set.reps);
+    final tCtrl1 = _getTimeCtrl(exerciseIndex, setIndex, set.timeSeconds);
+
+    final wCtrl2 =
+        _getSuperWeightCtrl(exerciseIndex, setIndex, set.supersetWeightKg);
+    final rCtrl2 =
+        _getSuperRepsCtrl(exerciseIndex, setIndex, set.supersetReps);
+    final tCtrl2 =
+        _getSuperTimeCtrl(exerciseIndex, setIndex, set.supersetTimeSeconds);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      color: setIndex % 2 == 1
+          ? AppTheme.surfaceLighter.withValues(alpha: 0.2)
+          : Colors.transparent,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Round Number Badge
+          SizedBox(
+            width: 36,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: set.completed
+                    ? AppTheme.accentAmber.withValues(alpha: 0.18)
+                    : AppTheme.surfaceLighter,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: set.completed
+                      ? AppTheme.accentAmber.withValues(alpha: 0.5)
+                      : AppTheme.surfaceHighlight,
+                ),
+              ),
+              child: Text(
+                '${set.setNumber}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: set.completed
+                      ? AppTheme.accentAmber
+                      : AppTheme.textMuted,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Two Paired Movements
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Movement 1 Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '1. ${exerciseLog.exerciseName}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildMovementMiniInputs(
+                      isTime: isTime1,
+                      weight: set.weightKg,
+                      weightCtrl: wCtrl1,
+                      reps: set.reps,
+                      repsCtrl: rCtrl1,
+                      timeSeconds: set.timeSeconds,
+                      timeCtrl: tCtrl1,
+                      onWeightChanged: (w) => setState(() => set.weightKg = w),
+                      onRepsChanged: (r) => setState(() => set.reps = r),
+                      onTimeChanged: (t) => setState(() => set.timeSeconds = t),
+                      color: AppTheme.primary,
+                      movementTitle: exerciseLog.exerciseName,
+                      exerciseIndex: exerciseIndex,
+                      setIndex: setIndex,
+                      set: set,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Movement 2 Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentAmber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bolt,
+                              size: 11, color: AppTheme.accentAmber),
+                          const SizedBox(width: 2),
+                          Text(
+                            '2. ${exerciseLog.supersetName?.isNotEmpty == true ? exerciseLog.supersetName : "Movement 2"}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.accentAmber,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildMovementMiniInputs(
+                      isTime: isTime2,
+                      weight: set.supersetWeightKg,
+                      weightCtrl: wCtrl2,
+                      reps: set.supersetReps,
+                      repsCtrl: rCtrl2,
+                      timeSeconds: set.supersetTimeSeconds,
+                      timeCtrl: tCtrl2,
+                      onWeightChanged: (w) =>
+                          setState(() => set.supersetWeightKg = w),
+                      onRepsChanged: (r) =>
+                          setState(() => set.supersetReps = r),
+                      onTimeChanged: (t) =>
+                          setState(() => set.supersetTimeSeconds = t),
+                      color: AppTheme.accentAmber,
+                      movementTitle: exerciseLog.supersetName ?? 'Movement 2',
+                      exerciseIndex: exerciseIndex,
+                      setIndex: setIndex,
+                      set: set,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Checkbox & Delete
+          SizedBox(
+            width: 64,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      set.completed = !set.completed;
+                    });
+                  },
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: set.completed
+                          ? AppTheme.accentAmber
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(
+                        color: set.completed
+                            ? AppTheme.accentAmber
+                            : AppTheme.surfaceHighlight,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: set.completed
+                        ? const Icon(Icons.check,
+                            size: 16, color: Colors.black)
+                        : null,
+                  ),
+                ),
+                if (_exerciseLogs[exerciseIndex].sets.length > 1) ...[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => _removeSet(exerciseIndex, setIndex),
+                    borderRadius: BorderRadius.circular(10),
+                    child: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.close,
+                          size: 16, color: AppTheme.accentRose),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExerciseCard(int exerciseIndex) {
     final exerciseLog = _exerciseLogs[exerciseIndex];
     final isTimeBased = exerciseLog.isTimeBased;
+    final isSuperset = exerciseLog.isSuperset;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -624,17 +1074,48 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                     children: [
                       Row(
                         children: [
+                          if (isSuperset) ...[
+                            const Icon(Icons.bolt,
+                                size: 16, color: AppTheme.accentAmber),
+                            const SizedBox(width: 4),
+                          ],
                           Flexible(
                             child: Text(
-                              exerciseLog.exerciseName,
-                              style: const TextStyle(
+                              isSuperset
+                                  ? '${exerciseLog.exerciseName} + ${exerciseLog.supersetName?.isNotEmpty == true ? exerciseLog.supersetName : "Movement 2"}'
+                                  : exerciseLog.exerciseName,
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                                color: isSuperset
+                                    ? AppTheme.accentAmber
+                                    : AppTheme.textPrimary,
                               ),
                             ),
                           ),
-                          if (isTimeBased) ...[
+                          if (isSuperset) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentAmber
+                                    .withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                    color: AppTheme.accentAmber
+                                        .withValues(alpha: 0.4)),
+                              ),
+                              child: const Text(
+                                'SUPERSET',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.accentAmber,
+                                ),
+                              ),
+                            ),
+                          ] else if (isTimeBased) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -665,21 +1146,47 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.secondary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          exerciseLog.targetMuscle,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.secondary,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.secondary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isSuperset
+                                  ? '1: ${exerciseLog.targetMuscle}'
+                                  : exerciseLog.targetMuscle,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.secondary,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (isSuperset) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentAmber
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '2: ${exerciseLog.supersetTargetMuscle ?? "General"}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.accentAmber,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -688,9 +1195,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                   onPressed: () => _addSetToExercise(exerciseIndex),
                   icon:
                       const Icon(Icons.add, size: 16, color: AppTheme.primary),
-                  label: const Text(
-                    'Add Set',
-                    style: TextStyle(
+                  label: Text(
+                    isSuperset ? 'Add Round' : 'Add Set',
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.primary,
                       fontWeight: FontWeight.w600,
@@ -717,34 +1224,46 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
             color: AppTheme.bgDark.withValues(alpha: 0.4),
             child: Row(
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 36,
-                  child: Text('SET',
+                  child: Text(isSuperset ? 'ROUND' : 'SET',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textMuted)),
+                          color: isSuperset
+                              ? AppTheme.accentAmber
+                              : AppTheme.textMuted)),
                 ),
                 const SizedBox(width: 6),
-                Expanded(
-                  flex: isTimeBased ? 3 : 3,
-                  child: Text(
-                      isTimeBased ? 'EXTRA WT (KG)' : 'WEIGHT (KG)',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textMuted)),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: isTimeBased ? 4 : 3,
-                  child: Text(
-                      isTimeBased ? 'HOLD DURATION' : 'REPS',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textMuted)),
-                ),
+                if (isSuperset) ...[
+                  const Expanded(
+                    child: Text('PAIRED MOVEMENTS (1 & 2)',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textMuted)),
+                  ),
+                ] else ...[
+                  Expanded(
+                    flex: isTimeBased ? 3 : 3,
+                    child: Text(
+                        isTimeBased ? 'EXTRA WT (KG)' : 'WEIGHT (KG)',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textMuted)),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: isTimeBased ? 4 : 3,
+                    child: Text(
+                        isTimeBased ? 'HOLD DURATION' : 'REPS',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textMuted)),
+                  ),
+                ],
                 const SizedBox(width: 6),
                 const SizedBox(
                   width: 64,
@@ -767,7 +1286,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                 const Divider(height: 1, color: AppTheme.surfaceHighlight),
             itemBuilder: (context, setIndex) {
               final set = exerciseLog.sets[setIndex];
-              return _buildSetRow(exerciseIndex, setIndex, set);
+              return isSuperset
+                  ? _buildSupersetRow(exerciseIndex, setIndex, set)
+                  : _buildSetRow(exerciseIndex, setIndex, set);
             },
           ),
         ],

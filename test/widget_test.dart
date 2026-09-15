@@ -153,6 +153,62 @@ void main() {
     expect(retrieved.bodyWeightKg, equals(75.5));
     expect(retrieved.age, equals(27));
   });
+
+  testWidgets('Can render Superset card in LogSessionScreen with paired movements',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final supersetSchedule = WorkoutSchedule(
+      id: 'superset-sched-1',
+      title: 'Chest & Arms Blast',
+      colorHex: '#F59E0B',
+      scheduledDays: const ['Wednesday'],
+      createdAt: DateTime.now(),
+      exercises: [
+        Exercise(
+          id: 'ex-ss-1',
+          name: 'Barbell Bench Press',
+          targetMuscle: 'Chest',
+          defaultSets: 3,
+          defaultReps: 8,
+          defaultWeightKg: 80.0,
+          isSuperset: true,
+          supersetName: 'Dumbbell Bicep Curls',
+          supersetTargetMuscle: 'Biceps',
+          supersetIsTimeBased: false,
+          supersetReps: 12,
+          supersetWeightKg: 15.0,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.darkTheme,
+      home: LogSessionScreen(schedule: supersetSchedule),
+    ));
+    await tester.pumpAndSettle();
+
+    // Verify Superset Header and Badge
+    expect(find.text('SUPERSET'), findsOneWidget);
+    expect(find.text('Barbell Bench Press + Dumbbell Bicep Curls'), findsOneWidget);
+    expect(find.text('ROUND'), findsOneWidget);
+    expect(find.text('PAIRED MOVEMENTS (1 & 2)'), findsOneWidget);
+    expect(find.text('Add Round'), findsOneWidget);
+
+    // Verify Movement 1 and Movement 2 labels
+    expect(find.text('1. Barbell Bench Press'), findsWidgets);
+    expect(find.text('2. Dumbbell Bicep Curls'), findsWidgets);
+
+    // Tap Add Round
+    await tester.tap(find.text('Add Round'));
+    await tester.pumpAndSettle();
+
+    // Verify round 4 added
+    expect(find.text('4'), findsOneWidget);
+  });
 }
+
 
 

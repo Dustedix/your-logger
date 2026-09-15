@@ -172,10 +172,17 @@ class ScheduleCard extends StatelessWidget {
                             color: AppTheme.surfaceHighlight.withValues(alpha: 0.5)),
                       ),
                       child: Text(
-                        '${ex.name} (${ex.defaultSets}×${ex.isTimeBased ? '${ex.defaultTimeSeconds}s' : '${ex.defaultReps}'})',
-                        style: const TextStyle(
+                        ex.isSuperset
+                            ? '⚡ ${ex.name} + ${ex.supersetName ?? "Pair"} (${ex.defaultSets}×)'
+                            : '${ex.name} (${ex.defaultSets}×${ex.isTimeBased ? '${ex.defaultTimeSeconds}s' : '${ex.defaultReps}'})',
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppTheme.textSecondary,
+                          color: ex.isSuperset
+                              ? AppTheme.accentAmber
+                              : AppTheme.textSecondary,
+                          fontWeight: ex.isSuperset
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     );
