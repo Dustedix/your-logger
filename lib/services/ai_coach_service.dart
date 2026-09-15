@@ -16,6 +16,7 @@ class AiCoachService {
     required List<WorkoutLog> logs,
     required List<WorkoutSchedule> schedules,
     required UserProfile profile,
+    String? customFocus,
   }) async {
     final apiKey = profile.geminiApiKey.trim();
     if (apiKey.isEmpty) {
@@ -24,7 +25,7 @@ class AiCoachService {
       );
     }
 
-    final prompt = _buildAnalysisPrompt(logs, schedules, profile);
+    final prompt = _buildAnalysisPrompt(logs, schedules, profile, customFocus);
     return _callGeminiApi(apiKey: apiKey, prompt: prompt);
   }
 
@@ -67,16 +68,20 @@ $question
   static String _buildAnalysisPrompt(
     List<WorkoutLog> logs,
     List<WorkoutSchedule> schedules,
-    UserProfile profile,
-  ) {
+    UserProfile profile, [
+    String? customFocus,
+  ]) {
     final contextPrompt = _buildContextPrompt(logs, schedules, profile);
+    final focusGoal = (customFocus != null && customFocus.trim().isNotEmpty)
+        ? customFocus.trim()
+        : profile.trainingGoal;
 
     return '''
 You are "Your Log AI Coach", a certified elite strength coach, hypertrophy specialist, and biomechanics expert.
 Perform a comprehensive, motivating, and highly analytical review of the user's workout logs and training progress.
 
 User Profile:
-- Primary Goal: ${profile.trainingGoal}
+- Primary Goal / Focus: $focusGoal
 - Experience Level: ${profile.experienceLevel}
 ${profile.bodyWeightKg != null ? "- Bodyweight: ${profile.bodyWeightKg} kg" : ""}
 ${profile.age != null ? "- Age: ${profile.age}" : ""}

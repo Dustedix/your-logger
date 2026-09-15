@@ -32,10 +32,15 @@ class _AiCoachScreenState extends State<AiCoachScreen>
   ];
   bool _isChatLoading = false;
 
+  // Analysis focus controller (customizable directly on analysis card)
+  late final TextEditingController _analysisFocusCtrl;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    final profile = _storage.getProfile();
+    _analysisFocusCtrl = TextEditingController(text: profile.trainingGoal);
   }
 
   @override
@@ -43,6 +48,7 @@ class _AiCoachScreenState extends State<AiCoachScreen>
     _tabController.dispose();
     _chatInputCtrl.dispose();
     _chatScrollCtrl.dispose();
+    _analysisFocusCtrl.dispose();
     super.dispose();
   }
 
@@ -58,7 +64,7 @@ class _AiCoachScreenState extends State<AiCoachScreen>
       text: profile.age != null ? profile.age.toString() : '',
     );
 
-    String selectedGoal = profile.trainingGoal;
+    final goalCtrl = TextEditingController(text: profile.trainingGoal);
     String selectedExp = profile.experienceLevel;
     bool obscureKey = true;
 
@@ -187,35 +193,71 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text('Primary Training Focus',
-                        style: TextStyle(
-                            fontSize: 12, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: selectedGoal,
-                      dropdownColor: AppTheme.surfaceDark,
-                      decoration: const InputDecoration(),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Hypertrophy & Muscle Building',
-                          child: Text('Hypertrophy & Muscle Building'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Strength & Progressive Overload',
-                          child: Text('Strength & Progressive Overload'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Fat Loss & Conditioning',
-                          child: Text('Fat Loss & Conditioning'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Core, Endurance & Posture',
-                          child: Text('Core, Endurance & Posture'),
-                        ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Primary Training Focus',
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.textSecondary)),
+                        const Text('Tap preset or type custom',
+                            style: TextStyle(fontSize: 10, color: AppTheme.primary)),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedGoal = val);
-                      },
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: goalCtrl,
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Hypertrophy, Strength, Core & Posture...',
+                        prefixIcon: const Icon(Icons.track_changes, size: 18, color: AppTheme.primary),
+                        suffixIcon: goalCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                                onPressed: () => setModalState(() => goalCtrl.clear()),
+                              )
+                            : null,
+                      ),
+                      onChanged: (_) => setModalState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          'Hypertrophy & Muscle Building',
+                          'Strength & Progressive Overload',
+                          'Fat Loss & Conditioning',
+                          'Core, Endurance & Posture',
+                          'Calisthenics & Bodyweight',
+                        ].map((preset) {
+                          final isSel = goalCtrl.text.trim().toLowerCase() == preset.toLowerCase();
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () => setModalState(() => goalCtrl.text = preset),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSel ? AppTheme.primary.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSel ? AppTheme.primary : AppTheme.surfaceHighlight,
+                                  ),
+                                ),
+                                child: Text(
+                                  preset,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    color: isSel ? AppTheme.primary : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text('Experience Level',
@@ -259,14 +301,18 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                         onPressed: () async {
                           final weight = double.tryParse(weightCtrl.text.trim());
                           final age = int.tryParse(ageCtrl.text.trim());
+                          final customGoal = goalCtrl.text.trim().isEmpty
+                              ? 'Hypertrophy & Muscle Building'
+                              : goalCtrl.text.trim();
                           final updated = profile.copyWith(
                             geminiApiKey: keyCtrl.text.trim(),
                             bodyWeightKg: weight,
                             age: age,
-                            trainingGoal: selectedGoal,
+                            trainingGoal: customGoal,
                             experienceLevel: selectedExp,
                           );
                           await _storage.saveProfile(updated);
+                          _analysisFocusCtrl.text = customGoal;
                           if (ctx.mounted) Navigator.pop(ctx);
                           setState(() {});
                         },
@@ -297,14 +343,17 @@ class _AiCoachScreenState extends State<AiCoachScreen>
     try {
       final logs = _storage.getLogs();
       final schedules = _storage.getSchedules();
+      final customFocus = _analysisFocusCtrl.text.trim();
 
       final result = await AiCoachService.generateWorkoutAnalysis(
         logs: logs,
         schedules: schedules,
         profile: profile,
+        customFocus: customFocus.isNotEmpty ? customFocus : null,
       );
 
       final updated = profile.copyWith(
+        trainingGoal: customFocus.isNotEmpty ? customFocus : profile.trainingGoal,
         lastAiAnalysis: result,
         lastAiAnalysisDate: DateTime.now(),
       );
@@ -484,7 +533,7 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                       Icon(Icons.psychology, color: AppTheme.primary, size: 26),
                       SizedBox(width: 8),
                       Text(
-                        'Gemini 1.5 Flash Analytics',
+                        'Gemini AI Analytics',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -493,19 +542,39 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                       ),
                     ],
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      profile.trainingGoal.split('&').first.trim(),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w600,
+                  InkWell(
+                    onTap: _showSettingsDialog,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.tune, size: 12, color: AppTheme.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            profile.trainingGoal.isNotEmpty
+                                ? (profile.trainingGoal.contains('&')
+                                    ? profile.trainingGoal.split('&').first.trim()
+                                    : (profile.trainingGoal.length > 20
+                                        ? '${profile.trainingGoal.substring(0, 18)}...'
+                                        : profile.trainingGoal))
+                                : 'Custom Focus',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -517,6 +586,90 @@ class _AiCoachScreenState extends State<AiCoachScreen>
                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
               const SizedBox(height: 14),
+
+              // Custom Primary Focus Input
+              Row(
+                children: [
+                  const Icon(Icons.track_changes, size: 14, color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Primary Focus for this Analysis',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_analysisFocusCtrl.text.trim() != profile.trainingGoal.trim())
+                    InkWell(
+                      onTap: () => setState(() => _analysisFocusCtrl.text = profile.trainingGoal),
+                      child: const Text(
+                        'Reset to Default',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _analysisFocusCtrl,
+                style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Type your focus (e.g. Chest Hypertrophy, Squat PR, HIIT)...',
+                  prefixIcon: const Icon(Icons.edit_note, size: 18, color: AppTheme.primary),
+                  suffixIcon: _analysisFocusCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16, color: AppTheme.textMuted),
+                          onPressed: () => setState(() => _analysisFocusCtrl.clear()),
+                        )
+                      : null,
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              // Preset chips for quick 1-tap focus switching
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    'Hypertrophy & Muscle Building',
+                    'Strength & Progressive Overload',
+                    'Fat Loss & Conditioning',
+                    'Core, Endurance & Posture',
+                    'Plateau Breakthrough',
+                    'Calisthenics & Bodyweight',
+                  ].map((preset) {
+                    final isSel = _analysisFocusCtrl.text.trim().toLowerCase() == preset.toLowerCase();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        onTap: () => setState(() => _analysisFocusCtrl.text = preset),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isSel ? AppTheme.primary.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSel ? AppTheme.primary : AppTheme.surfaceHighlight,
+                            ),
+                          ),
+                          child: Text(
+                            preset,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                              color: isSel ? AppTheme.primary : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
