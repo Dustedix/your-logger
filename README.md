@@ -1,17 +1,199 @@
-# workout_app
+# 🏋️‍♂️ Your Log — Smart Workout & Routine Tracker
 
-A new Flutter project.
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Gemini](https://img.shields.io/badge/Gemini%20AI-3.6%20Flash-8E75B2?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Web App](https://img.shields.io/badge/Live%20Demo-workout--tracker-10B981?style=for-the-badge&logo=google-chrome&logoColor=white)](https://workout-tracker-171d1.web.app)
 
-## Getting Started
+> **Your Log** is a modern, responsive, offline-first workout tracking and fitness analytics web and mobile app built with Flutter. It combines seamless session logging, superset orchestration, timed exercise stopwatches, real-time Cloud Firestore synchronization, and an AI Workout Coach powered by Google's Gemini 3.6 Flash.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## 🌐 Live Web App
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The application is deployed and publicly accessible 24/7 on Firebase Hosting:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+🔗 **[https://workout-tracker-171d1.web.app](https://workout-tracker-171d1.web.app)**
+
+---
+
+## ✨ Key Features
+
+### 🏋️ Routine & Split Builder
+- Create unlimited custom workout routines (Push / Pull / Legs, Upper / Lower, Full Body, Arnold Split, etc.).
+- Set target sets, rep ranges, target weights, target rest intervals, and timed durations for each exercise.
+- Reorder, duplicate, and fine-tune routines with full responsive grid and card layouts.
+
+### ⚡ Superset Workouts (Back-to-Back Sets)
+- Switch any exercise to a **Superset** with a single toggle in the routine builder.
+- Define secondary movements (e.g. Incline Bench Press paired with Dumbbell Chest Fly, or Bicep Curls paired with Tricep Extensions).
+- Dual-input session logging for Primary and Superset movements with combined volume calculation.
+
+### ⏱️ Timed Hold & Plank Stopwatch
+- Full support for time-based exercises (Planks, Wall Sits, Deadhangs, Hollow Body Holds).
+- Embedded, interactive stopwatch with tactile play, pause, reset, and direct log entry.
+
+### 🤖 Gemini 3.6 Flash AI Coach
+- **Progressive Overload Recommendations**: AI analyzes your historic weights, reps, and volume across sessions to suggest exact target weights for your next workout.
+- **Fatigue & Deload Analysis**: Flags plateauing exercises or potential overtraining patterns.
+- **Custom Primary Focus**: Prompt the AI to focus on specific muscle priorities, injury rehabilitation, strength peaking, or endurance hypertrophy.
+- **Secure Client API Storage**: Gemini API keys are encrypted in local device storage, never exposed or committed.
+
+### ☁️ Offline-First & Real-Time Sync
+- Instant, zero-latency startup using local `SharedPreferences` caching.
+- Seamless background synchronization to **Google Cloud Firestore**.
+- Multi-device updates trigger real-time reactive UI re-renders via Firestore snapshot streams.
+
+### 📊 Analytics & Visual Insights
+- Visual volume trends across weeks and months.
+- Set completion breakdowns and target adherence metrics.
+- Comprehensive workout history with quick-revisit summaries and set-by-set reviews.
+
+### 🎨 Sleek Emerald Dark Mode
+- Built with a curated dark aesthetic (deep slate, emerald green accents, muted borders).
+- Google Fonts (`Outfit`) typography and smooth micro-animations.
+
+---
+
+## 📚 Detailed Codebase Documentation
+
+For a comprehensive file-by-file architectural breakdown, data flow explanations, models, services, and screen hierarchies, read:
+
+👉 **[CODEBASE_EXPLANATION.md](CODEBASE_EXPLANATION.md)**
+
+---
+
+## 📁 Repository Structure
+
+```
+.
+├── lib/
+│   ├── main.dart                   # Application entrypoint & theme initialization
+│   ├── models/                     # Data models & JSON serialization
+│   │   ├── exercise.dart           # Exercise schema (standard & superset support)
+│   │   ├── workout_schedule.dart   # Routine split container
+│   │   ├── workout_log.dart        # Session log & set records
+│   │   └── user_profile.dart       # User profile & target metrics
+│   ├── services/                   # Business logic & persistence
+│   │   ├── storage_service.dart    # SharedPreferences + Cloud Firestore sync
+│   │   └── ai_coach_service.dart   # Google Gemini 3.6 Flash REST integration
+│   ├── screens/                    # View layer
+│   │   ├── home_screen.dart        # Main navigation & bottom bar
+│   │   ├── schedules_tab.dart      # Routine library & builder launcher
+│   │   ├── schedule_editor_screen.dart # Routine creation & superset toggle
+│   │   ├── log_session_screen.dart # Active workout logging & stopwatch
+│   │   ├── history_tab.dart        # Completed workouts list & detail modals
+│   │   ├── analytics_tab.dart      # Visual statistics & volume charts
+│   │   └── ai_coach_screen.dart    # AI analysis dashboard & custom prompt focus
+│   ├── widgets/                    # Modular reusable UI components
+│   │   ├── superset_badge.dart     # Superset visual indicator badge
+│   │   └── timer_dialog.dart       # Rest interval countdown modal
+│   └── theme/                      # Styling tokens & theme configuration
+│       └── app_theme.dart          # Dark emerald theme, colors, button styles
+├── web/                            # Web platform scaffolding & PWA manifest
+├── test/                           # Unit & model verification tests
+│   ├── widget_test.dart            # Standard widget test
+│   └── superset_model_test.dart    # Superset serialization & volume unit tests
+├── Dockerfile                      # Production container image configuration
+├── docker-compose.yml              # Local orchestration configuration
+├── firebase.json                   # Firebase Hosting configuration
+└── CODEBASE_EXPLANATION.md         # In-depth architectural guide
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`v3.19+`) or [Docker](https://www.docker.com/)
+- Chrome / Edge / Firefox (for web) or an Android / iOS device/emulator
+
+### Running Locally with Flutter
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Dustedix/your-logger.git
+   cd your-logger
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Run on Chrome (Web):**
+   ```bash
+   flutter run -d chrome
+   ```
+
+4. **Run on Mobile / Desktop:**
+   ```bash
+   flutter run
+   ```
+
+---
+
+## 🐳 Running with Docker
+
+You can build and test the application inside an isolated Docker container without installing Flutter or Dart on your host system:
+
+### 1. Run Tests Inside Docker
+```bash
+docker run --rm \
+  -v "$PWD":/app \
+  -w /app \
+  ghcr.io/cirruslabs/flutter:stable \
+  bash -c "flutter pub get && flutter test"
+```
+
+### 2. Build Production Web Bundle Inside Docker
+```bash
+docker run --rm \
+  -v "$PWD":/app \
+  -w /app \
+  ghcr.io/cirruslabs/flutter:stable \
+  bash -c "flutter pub get && flutter build web --release"
+```
+The compiled static assets will be output to `build/web/`.
+
+---
+
+## 🚀 Deployment to Firebase Hosting
+
+To deploy updates to the live web application:
+
+1. **Build the production release:**
+   ```bash
+   flutter build web --release
+   ```
+
+2. **Deploy via Firebase CLI:**
+   ```bash
+   firebase deploy --only hosting
+   ```
+   Or deploy with token in CI/CD:
+   ```bash
+   firebase deploy --only hosting --token "$FIREBASE_TOKEN"
+   ```
+
+---
+
+## 🧪 Testing
+
+Run the automated test suite covering models, superset serialization, and volume math:
+
+```bash
+flutter test
+```
+
+Test files:
+- `test/superset_model_test.dart`: Validates exercise JSON serialization, backward compatibility for legacy routines, and superset paired logging.
+- `test/widget_test.dart`: Smoke test for application bootstrapping.
+
+---
+
+## 🛡️ License
+
+This project is licensed under the [MIT License](LICENSE).
