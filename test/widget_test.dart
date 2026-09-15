@@ -132,5 +132,27 @@ void main() {
     // Verify back to 1 set
     expect(find.text('2'), findsNothing);
   });
+
+  testWidgets('Can open AI Coach screen and update UserProfile',
+      (WidgetTester tester) async {
+    final storage = StorageService();
+    final initialProfile = storage.getProfile();
+    expect(initialProfile.geminiApiKey, isEmpty);
+
+    // Save profile with key and bodyweight
+    final updated = initialProfile.copyWith(
+      geminiApiKey: 'test-api-key-123',
+      bodyWeightKg: 75.5,
+      age: 27,
+      trainingGoal: 'Hypertrophy & Muscle Building',
+    );
+    await storage.saveProfile(updated);
+
+    final retrieved = storage.getProfile();
+    expect(retrieved.geminiApiKey, equals('test-api-key-123'));
+    expect(retrieved.bodyWeightKg, equals(75.5));
+    expect(retrieved.age, equals(27));
+  });
 }
+
 

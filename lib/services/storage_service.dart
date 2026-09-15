@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../models/exercise.dart';
 import '../models/workout_schedule.dart';
 import '../models/workout_log.dart';
+import '../models/user_profile.dart';
 
 class SyncResult {
   final bool success;
@@ -20,6 +21,7 @@ class StorageService extends ChangeNotifier {
   static const String _keySchedules = 'workout_schedules_v1';
   static const String _keyLogs = 'workout_logs_v1';
   static const String _keyHasSeeded = 'workout_has_seeded_v1';
+  static const String _keyProfile = 'workout_user_profile_v1';
   static final _uuid = const Uuid();
 
   static final StorageService _instance = StorageService._internal();
@@ -434,5 +436,25 @@ class StorageService extends ChangeNotifier {
 
   List<WorkoutLog> getLogsForSchedule(String scheduleId) {
     return getLogs().where((l) => l.scheduleId == scheduleId).toList();
+  }
+
+  // USER PROFILE & AI SETTINGS
+  UserProfile getProfile() {
+    final jsonStr = _prefs?.getString(_keyProfile);
+    if (jsonStr == null || jsonStr.isEmpty) {
+      return const UserProfile();
+    }
+    try {
+      final Map<String, dynamic> map = jsonDecode(jsonStr);
+      return UserProfile.fromJson(map);
+    } catch (_) {
+      return const UserProfile();
+    }
+  }
+
+  Future<void> saveProfile(UserProfile profile) async {
+    final encoded = jsonEncode(profile.toJson());
+    await _prefs?.setString(_keyProfile, encoded);
+    notifyListeners();
   }
 }
