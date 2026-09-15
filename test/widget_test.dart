@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_app/main.dart';
+import 'package:workout_app/services/auth_service.dart';
 import 'package:workout_app/services/storage_service.dart';
 import 'package:workout_app/screens/log_session_screen.dart';
+import 'package:workout_app/screens/login_screen.dart';
 import 'package:workout_app/theme/app_theme.dart';
 import 'package:workout_app/models/exercise.dart';
 import 'package:workout_app/models/workout_schedule.dart';
@@ -11,15 +13,31 @@ import 'package:workout_app/models/workout_schedule.dart';
 void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    await StorageService().init();
+    await AuthService().init();
+    await AuthService().register(
+      username: 'tester',
+      displayName: 'Tester',
+      secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+    );
+    await StorageService().init('tester');
   });
 
-  testWidgets('App loads and shows workout tracker', (WidgetTester tester) async {
+  testWidgets('App loads and shows workout tracker for authenticated user', (WidgetTester tester) async {
     await tester.pumpWidget(const WorkoutTrackerApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Workout Schedules'), findsOneWidget);
     expect(find.text('Push Day (Chest, Shoulders, Triceps)'), findsOneWidget);
+  });
+
+  testWidgets('Unauthenticated state renders LoginScreen', (WidgetTester tester) async {
+    await AuthService().logout();
+    await tester.pumpWidget(const WorkoutTrackerApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.text('Your Log'), findsOneWidget);
+    expect(find.text('Unlock with Google Authenticator'), findsOneWidget);
   });
 
   testWidgets('Can render Log Session screen with Plank timer & rep controls',

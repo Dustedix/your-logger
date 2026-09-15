@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/schedule_card.dart';
 import 'log_session_screen.dart';
 import 'schedule_editor_screen.dart';
+import '../services/auth_service.dart';
 
 class SchedulesTab extends StatefulWidget {
   final VoidCallback onDataChanged;
@@ -185,6 +186,123 @@ class _SchedulesTabState extends State<SchedulesTab> {
     );
   }
 
+  void _showAccountDialog() {
+    final auth = AuthService();
+    final user = auth.currentUser;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: AppTheme.primary),
+            SizedBox(width: 8),
+            Text('Account & Security', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceHighlight.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.surfaceHighlight),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppTheme.primary,
+                    child: Text(
+                      (user?.displayName.isNotEmpty ?? false)
+                          ? user!.displayName[0].toUpperCase()
+                          : 'U',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.displayName ?? 'User',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          '@${user?.username ?? "unknown"}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(Icons.verified_user, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Protected with Google Authenticator (TOTP)',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.folder_shared_outlined, size: 16, color: AppTheme.secondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Private Cloud: users/${user?.username ?? ""}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.surfaceHighlight,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.swap_horiz, size: 18),
+            label: const Text('Switch / Logout'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await auth.logout();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final schedules = _storage.getSchedules();
@@ -207,6 +325,11 @@ class _SchedulesTabState extends State<SchedulesTab> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Account & Security',
+            icon: const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 24),
+            onPressed: () => _showAccountDialog(),
+          ),
           IconButton(
             tooltip: 'Firebase Cloud Sync',
             icon: const Icon(Icons.cloud_sync, color: AppTheme.secondary, size: 24),

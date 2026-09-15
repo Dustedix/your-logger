@@ -144,22 +144,43 @@ Stores athlete profile metadata:
 - `geminiApiKey`: User-provided Gemini API key stored locally.
 - `lastAiAnalysis` & `lastAiAnalysisDate`: Cached output of the most recent Gemini performance review.
 
+### 5. [user_account.dart](file:///Users/admin/Documents/PV/lib/models/user_account.dart)
+Stores user credentials for Google Authenticator authentication:
+- `username`: Unique lowercase handle identifying the user (e.g. `reyhan`).
+- `displayName`: User-friendly title displayed in UI headers and avatar cards.
+- `totpSecret`: Cryptographically generated Base32 secret key shared with the Google Authenticator app.
+- `createdAt` & `lastLoginAt`: Audit timestamps for account creation and session tracking.
+
 ---
 
 ## 5. Service Layer (`lib/services/`)
 
-### 1. [storage_service.dart](file:///Users/admin/Documents/PV/lib/services/storage_service.dart)
-A singleton class extending Flutter's `ChangeNotifier` responsible for local persistence and real-time cloud synchronization.
+### 1. [totp_service.dart](file:///Users/admin/Documents/PV/lib/services/totp_service.dart)
+Pure Dart implementation of the **RFC 6238 (TOTP)** and **RFC 4648 (Base32)** standards compatible with Google Authenticator.
+- **`generateSecret({int length = 16})`**: Generates a cryptographically secure random Base32 string.
+- **`buildOtpAuthUri(...)`**: Constructs standard `otpauth://totp/YourLog:...` URI used to render the setup QR code.
+- **`generateCode(...)`**: Computes the 6-digit TOTP code using HMAC-SHA1 and dynamic truncation for any Unix timestamp.
+- **`verifyCode(...)`**: Verifies user input with a ±1 period (±30s) window tolerance to accommodate clock drift between mobile devices and the host.
+
+### 2. [auth_service.dart](file:///Users/admin/Documents/PV/lib/services/auth_service.dart)
+Manages user accounts, active sessions, and authentication state:
+- **`register(...)`**: Saves new credentials locally and registers the account in Cloud Firestore under `users/{username}/auth/credentials`.
+- **`loginWithTotp(...)`**: Validates the 6-digit code against the user's secret key and updates the active session.
+- **`logout()`**: Clears the active session and switches the app back to `LoginScreen`.
+- **`findAccount(...)`**: Resolves accounts from local storage or remote Firestore.
+
+### 3. [storage_service.dart](file:///Users/admin/Documents/PV/lib/services/storage_service.dart)
+A singleton class extending Flutter's `ChangeNotifier` responsible for user-scoped local persistence and real-time cloud synchronization.
+- **Multi-User Scoping**:
+  - Automatically isolates data per user: local keys (`workout_schedules_v1_{username}`, `workout_logs_v1_{username}`) and Firestore paths (`users/{username}/schedules`, `users/{username}/logs`).
+  - `switchUser(username)` cancels existing streams, switches the namespace, seeds default splits if empty, and connects user-specific real-time Firestore listeners.
 - **Dual-Mode Persistence**:
   - Writes to `SharedPreferences` for instantaneous offline reads and writes.
-  - Writes to Cloud Firestore (`schedules` and `logs` collections) in the background.
+  - Writes to Cloud Firestore in the background.
 - **Real-Time Stream Sync**:
-  - Sets up `FirebaseFirestore.instance.collection('...').snapshots().listen(...)`.
-  - When another device logs a workout or edits a schedule, the local cache updates and calls `notifyListeners()`.
-- **Default Seed Data**:
-  - Automatically seeds three realistic routines (*Push Day*, *Pull Day*, *Legs & Core*) on first install so new users have a ready-to-use experience immediately.
+  - Sets up snapshot streams on user-specific collections, updating local state and calling `notifyListeners()`.
 
-### 2. [ai_coach_service.dart](file:///Users/admin/Documents/PV/lib/services/ai_coach_service.dart)
+### 4. [ai_coach_service.dart](file:///Users/admin/Documents/PV/lib/services/ai_coach_service.dart)
 Integrates with the Google Gemini API using `gemini-3.6-flash`.
 - **`generateWorkoutAnalysis(...)`**:
   - Constructs a prompt packaging the user's logged history, completed volume, frequency, and custom focus.
@@ -171,36 +192,44 @@ Integrates with the Google Gemini API using `gemini-3.6-flash`.
 
 ## 6. Screens & User Interface (`lib/screens/`)
 
-### 1. [main_navigation_screen.dart](file:///Users/admin/Documents/PV/lib/screens/main_navigation_screen.dart)
-- Renders the bottom navigation bar (`Schedules`, `History`, `Analytics`, `AI Coach`).
+### 1. [login_screen.dart](file:///Users/admin/Documents/PV/lib/screens/login_screen.dart)
+- **Authentication Gateway**:
+  - Unauthenticated users are routed here by `WorkoutTrackerApp`.
+  - **Login Mode**: Displays saved accounts on the device, username entry, and a 6-digit PIN input for Google Authenticator.
+  - **Registration Mode**: Prompts for username and display name, generates an RFC 6238 Base32 secret key, displays the QR code using `qr_flutter`, and verifies the initial 6-digit confirmation code before creating the account.
+  - Supports manual key copying for devices without camera scanning.
+
+### 2. [main_navigation_screen.dart](file:///Users/admin/Documents/PV/lib/screens/main_navigation_screen.dart)
+- Renders the bottom navigation bar (`Schedules`, `History`, `Analytics`).
 - Listens to `StorageService` changes to trigger app-wide reactive rebuilds.
 
-### 2. [schedules_tab.dart](file:///Users/admin/Documents/PV/lib/screens/schedules_tab.dart)
-- Displays all created routines using `ScheduleCard` widgets.
+### 3. [schedules_tab.dart](file:///Users/admin/Documents/PV/lib/screens/schedules_tab.dart)
+- Displays all created routines for the active user using `ScheduleCard` widgets.
+- **Account & Security Modal**: Top bar icon allows viewing current user handle (`@username`), cloud sync path, and a 1-tap "Switch / Logout" button.
 - Provides a "+ Create Schedule" button and allows tapping any schedule to log a workout.
 
-### 3. [schedule_editor_screen.dart](file:///Users/admin/Documents/PV/lib/screens/schedule_editor_screen.dart)
+### 4. [schedule_editor_screen.dart](file:///Users/admin/Documents/PV/lib/screens/schedule_editor_screen.dart)
 - Enables routine title, description, accent color, and scheduled weekday selection.
 - Features an interactive **ReorderableListView** with drag handles to sort exercises.
 - **Normal vs ⚡ Superset Toggle**:
   - Lets users toggle between standard exercises and paired supersets.
   - Dynamically presents inputs for Movement 1 (Primary) and Movement 2 (Paired), along with shared set count.
 
-### 4. [log_session_screen.dart](file:///Users/admin/Documents/PV/lib/screens/log_session_screen.dart)
+### 5. [log_session_screen.dart](file:///Users/admin/Documents/PV/lib/screens/log_session_screen.dart)
 - Session logging screen with date picker, duration adjuster, and tactical set rows.
 - **Superset Row Layout**: Paired movements are rendered in linked rows with individual stepper controls for weight and reps/time.
 - **Built-in Plank Stopwatch**: For timed exercises, a 1-tap live stopwatch modal allows timing holds and auto-recording seconds.
 - **Controller Cache**: Prevents cursor jumping and text focus loss by caching `TextEditingController` instances per set.
 
-### 5. [history_tab.dart](file:///Users/admin/Documents/PV/lib/screens/history_tab.dart)
+### 6. [history_tab.dart](file:///Users/admin/Documents/PV/lib/screens/history_tab.dart)
 - Displays a chronological list of completed workouts using `HistoryCard` components.
 - Includes horizontal filter chips to inspect logs for specific routines.
 
-### 6. [analytics_tab.dart](file:///Users/admin/Documents/PV/lib/screens/analytics_tab.dart)
+### 7. [analytics_tab.dart](file:///Users/admin/Documents/PV/lib/screens/analytics_tab.dart)
 - Summarizes total volume lifted (in kg/tons), total reps, and total completed sets.
 - Displays weekly consistency and routine distribution metrics.
 
-### 7. [ai_coach_screen.dart](file:///Users/admin/Documents/PV/lib/screens/ai_coach_screen.dart)
+### 8. [ai_coach_screen.dart](file:///Users/admin/Documents/PV/lib/screens/ai_coach_screen.dart)
 - **AI Performance Review Tab**:
   - Features an editable **"Primary Focus for this Analysis"** input field and preset suggestion chips.
   - Generates Markdown-formatted progressive overload analysis via Gemini 3.6 Flash.

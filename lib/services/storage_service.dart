@@ -18,10 +18,6 @@ class SyncResult {
 }
 
 class StorageService extends ChangeNotifier {
-  static const String _keySchedules = 'workout_schedules_v1';
-  static const String _keyLogs = 'workout_logs_v1';
-  static const String _keyHasSeeded = 'workout_has_seeded_v1';
-  static const String _keyProfile = 'workout_user_profile_v1';
   static final _uuid = const Uuid();
 
   static final StorageService _instance = StorageService._internal();
@@ -31,17 +27,82 @@ class StorageService extends ChangeNotifier {
   SharedPreferences? _prefs;
   StreamSubscription? _schedulesSub;
   StreamSubscription? _logsSub;
+  String? _activeUser;
+
+  String? get activeUser => _activeUser;
+
+  String get _keySchedules => _activeUser != null && _activeUser!.isNotEmpty
+      ? 'workout_schedules_v1_$_activeUser'
+      : 'workout_schedules_v1';
+
+  String get _keyLogs => _activeUser != null && _activeUser!.isNotEmpty
+      ? 'workout_logs_v1_$_activeUser'
+      : 'workout_logs_v1';
+
+  String get _keyHasSeeded => _activeUser != null && _activeUser!.isNotEmpty
+      ? 'workout_has_seeded_v1_$_activeUser'
+      : 'workout_has_seeded_v1';
+
+  String get _keyProfile => _activeUser != null && _activeUser!.isNotEmpty
+      ? 'workout_user_profile_v1_$_activeUser'
+      : 'workout_user_profile_v1';
 
   bool get _isFirebaseReady => Firebase.apps.isNotEmpty;
   FirebaseFirestore? get _firestore =>
       _isFirebaseReady ? FirebaseFirestore.instance : null;
 
-  Future<void> init() async {
+  CollectionReference<Map<String, dynamic>>? get _schedulesCollection {
+    if (!_isFirebaseReady || _firestore == null) return null;
+    if (_activeUser != null && _activeUser!.isNotEmpty) {
+      return _firestore!.collection('users').doc(_activeUser!).collection('schedules');
+    }
+    return _firestore!.collection('schedules');
+  }
+
+  CollectionReference<Map<String, dynamic>>? get _logsCollection {
+    if (!_isFirebaseReady || _firestore == null) return null;
+    if (_activeUser != null && _activeUser!.isNotEmpty) {
+      return _firestore!.collection('users').doc(_activeUser!).collection('logs');
+    }
+    return _firestore!.collection('logs');
+  }
+
+  Future<void> init([String? initialUser]) async {
     _prefs ??= await SharedPreferences.getInstance();
+    _activeUser = initialUser?.trim().toLowerCase();
     await _seedDefaultsIfEmpty();
     if (_isFirebaseReady) {
       startRealtimeSync();
     }
+  }
+
+  /// Switches active user namespace and restarts realtime sync
+  Future<void> switchUser(String? username) async {
+    _schedulesSub?.cancel();
+    _logsSub?.cancel();
+    _activeUser = username?.trim().toLowerCase();
+
+    if (_activeUser != null && _activeUser!.isNotEmpty) {
+      // Migrate legacy default data if this user is totally empty and legacy data exists
+      final userSchedules = _prefs?.getString(_keySchedules);
+      if (userSchedules == null || userSchedules.isEmpty || userSchedules == '[]') {
+        final legacySchedules = _prefs?.getString('workout_schedules_v1');
+        if (legacySchedules != null && legacySchedules.isNotEmpty && legacySchedules != '[]') {
+          await _prefs?.setString(_keySchedules, legacySchedules);
+          final legacyLogs = _prefs?.getString('workout_logs_v1');
+          if (legacyLogs != null) {
+            await _prefs?.setString(_keyLogs, legacyLogs);
+          }
+          await _prefs?.setBool(_keyHasSeeded, true);
+        }
+      }
+      await _seedDefaultsIfEmpty();
+    }
+
+    if (_isFirebaseReady) {
+      startRealtimeSync();
+    }
+    notifyListeners();
   }
 
   /// Starts listening to real-time Cloud Firestore updates
@@ -50,36 +111,42 @@ class StorageService extends ChangeNotifier {
     _schedulesSub?.cancel();
     _logsSub?.cancel();
 
-    _schedulesSub = _firestore?.collection('schedules').snapshots().listen(
-      (snapshot) {
-        final cloudSchedules = snapshot.docs
-            .map((doc) => WorkoutSchedule.fromJson(doc.data()))
-            .toList();
-        final encoded =
-            jsonEncode(cloudSchedules.map((s) => s.toJson()).toList());
-        _prefs?.setString(_keySchedules, encoded);
-        _prefs?.setBool(_keyHasSeeded, true);
-        notifyListeners();
-      },
-      onError: (e) {
-        debugPrint('Firestore realtime schedules notice: $e');
-      },
-    );
+    final schedCol = _schedulesCollection;
+    if (schedCol != null) {
+      _schedulesSub = schedCol.snapshots().listen(
+        (snapshot) {
+          final cloudSchedules = snapshot.docs
+              .map((doc) => WorkoutSchedule.fromJson(doc.data()))
+              .toList();
+          final encoded =
+              jsonEncode(cloudSchedules.map((s) => s.toJson()).toList());
+          _prefs?.setString(_keySchedules, encoded);
+          _prefs?.setBool(_keyHasSeeded, true);
+          notifyListeners();
+        },
+        onError: (e) {
+          debugPrint('Firestore realtime schedules notice: $e');
+        },
+      );
+    }
 
-    _logsSub = _firestore?.collection('logs').snapshots().listen(
-      (snapshot) {
-        final cloudLogs = snapshot.docs
-            .map((doc) => WorkoutLog.fromJson(doc.data()))
-            .toList();
-        cloudLogs.sort((a, b) => b.completedDate.compareTo(a.completedDate));
-        final encoded = jsonEncode(cloudLogs.map((l) => l.toJson()).toList());
-        _prefs?.setString(_keyLogs, encoded);
-        notifyListeners();
-      },
-      onError: (e) {
-        debugPrint('Firestore realtime logs notice: $e');
-      },
-    );
+    final logCol = _logsCollection;
+    if (logCol != null) {
+      _logsSub = logCol.snapshots().listen(
+        (snapshot) {
+          final cloudLogs = snapshot.docs
+              .map((doc) => WorkoutLog.fromJson(doc.data()))
+              .toList();
+          cloudLogs.sort((a, b) => b.completedDate.compareTo(a.completedDate));
+          final encoded = jsonEncode(cloudLogs.map((l) => l.toJson()).toList());
+          _prefs?.setString(_keyLogs, encoded);
+          notifyListeners();
+        },
+        onError: (e) {
+          debugPrint('Firestore realtime logs notice: $e');
+        },
+      );
+    }
   }
 
   /// Pushes all local schedules and logs to Cloud Firestore with error reporting
@@ -92,21 +159,22 @@ class StorageService extends ChangeNotifier {
     }
     int count = 0;
     try {
-      final schedules = getSchedules();
-      for (final s in schedules) {
-        await _firestore
-            ?.collection('schedules')
-            .doc(s.id)
-            .set(s.toJson(), SetOptions(merge: true));
-        count++;
+      final schedCol = _schedulesCollection;
+      if (schedCol != null) {
+        final schedules = getSchedules();
+        for (final s in schedules) {
+          await schedCol.doc(s.id).set(s.toJson(), SetOptions(merge: true));
+          count++;
+        }
       }
-      final logs = getLogs();
-      for (final l in logs) {
-        await _firestore
-            ?.collection('logs')
-            .doc(l.id)
-            .set(l.toJson(), SetOptions(merge: true));
-        count++;
+
+      final logCol = _logsCollection;
+      if (logCol != null) {
+        final logs = getLogs();
+        for (final l in logs) {
+          await logCol.doc(l.id).set(l.toJson(), SetOptions(merge: true));
+          count++;
+        }
       }
       return SyncResult(success: true, count: count);
     } catch (e) {
@@ -119,23 +187,29 @@ class StorageService extends ChangeNotifier {
   Future<void> syncFromCloud() async {
     if (!_isFirebaseReady) return;
     try {
-      final schedSnap = await _firestore?.collection('schedules').get();
-      if (schedSnap != null && schedSnap.docs.isNotEmpty) {
-        final cloudSchedules = schedSnap.docs
-            .map((doc) => WorkoutSchedule.fromJson(doc.data()))
-            .toList();
-        await saveAllSchedules(cloudSchedules);
-      } else {
-        // If cloud collection is empty, push our local seeded routines to cloud
-        await pushAllToCloud();
+      final schedCol = _schedulesCollection;
+      if (schedCol != null) {
+        final schedSnap = await schedCol.get();
+        if (schedSnap.docs.isNotEmpty) {
+          final cloudSchedules = schedSnap.docs
+              .map((doc) => WorkoutSchedule.fromJson(doc.data()))
+              .toList();
+          await saveAllSchedules(cloudSchedules);
+        } else {
+          // If cloud collection is empty, push our local seeded routines to cloud
+          await pushAllToCloud();
+        }
       }
 
-      final logSnap = await _firestore?.collection('logs').get();
-      if (logSnap != null && logSnap.docs.isNotEmpty) {
-        final cloudLogs = logSnap.docs
-            .map((doc) => WorkoutLog.fromJson(doc.data()))
-            .toList();
-        await saveAllLogs(cloudLogs);
+      final logCol = _logsCollection;
+      if (logCol != null) {
+        final logSnap = await logCol.get();
+        if (logSnap.docs.isNotEmpty) {
+          final cloudLogs = logSnap.docs
+              .map((doc) => WorkoutLog.fromJson(doc.data()))
+              .toList();
+          await saveAllLogs(cloudLogs);
+        }
       }
     } catch (e) {
       debugPrint('Firestore sync notice (offline or read restricted): $e');
@@ -151,177 +225,177 @@ class StorageService extends ChangeNotifier {
       }
       return;
     }
-      final defaultSchedules = [
-        WorkoutSchedule(
-          id: _uuid.v4(),
-          title: 'Push Day (Chest, Shoulders, Triceps)',
-          description: 'Focus on horizontal and vertical pushing hypertrophy.',
-          colorHex: '#10B981', // Emerald
-          scheduledDays: ['Monday', 'Thursday'],
-          createdAt: DateTime.now().subtract(const Duration(days: 7)),
-          exercises: [
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Barbell Bench Press',
-              targetMuscle: 'Chest',
-              defaultSets: 4,
-              defaultReps: 8,
-              defaultWeightKg: 60.0,
-              notes: 'Keep shoulder blades retracted and elbows at 45 deg.',
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Incline Dumbbell Press',
-              targetMuscle: 'Upper Chest',
-              defaultSets: 3,
-              defaultReps: 10,
-              defaultWeightKg: 22.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Overhead Shoulder Press',
-              targetMuscle: 'Shoulders',
-              defaultSets: 3,
-              defaultReps: 10,
-              defaultWeightKg: 40.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Triceps Rope Pushdown',
-              targetMuscle: 'Triceps',
-              defaultSets: 3,
-              defaultReps: 12,
-              defaultWeightKg: 25.0,
-            ),
-          ],
-        ),
-        WorkoutSchedule(
-          id: _uuid.v4(),
-          title: 'Pull Day (Back, Rear Delts, Biceps)',
-          description: 'Vertical and horizontal pulling power and arm volume.',
-          colorHex: '#06B6D4', // Cyan
-          scheduledDays: ['Tuesday', 'Friday'],
-          createdAt: DateTime.now().subtract(const Duration(days: 6)),
-          exercises: [
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Barbell Bent-Over Row',
-              targetMuscle: 'Back',
-              defaultSets: 4,
-              defaultReps: 8,
-              defaultWeightKg: 65.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Lat Pulldown',
-              targetMuscle: 'Lats',
-              defaultSets: 3,
-              defaultReps: 10,
-              defaultWeightKg: 55.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Face Pulls',
-              targetMuscle: 'Rear Delts',
-              defaultSets: 3,
-              defaultReps: 15,
-              defaultWeightKg: 20.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Incline Dumbbell Bicep Curl',
-              targetMuscle: 'Biceps',
-              defaultSets: 3,
-              defaultReps: 12,
-              defaultWeightKg: 14.0,
-            ),
-          ],
-        ),
-        WorkoutSchedule(
-          id: _uuid.v4(),
-          title: 'Legs & Core Power',
-          description: 'Squats, posterior chain development, and core stability.',
-          colorHex: '#F59E0B', // Amber
-          scheduledDays: ['Wednesday', 'Saturday'],
-          createdAt: DateTime.now().subtract(const Duration(days: 5)),
-          exercises: [
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Barbell Back Squat',
-              targetMuscle: 'Quads & Glutes',
-              defaultSets: 4,
-              defaultReps: 8,
-              defaultWeightKg: 85.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Romanian Deadlift (RDL)',
-              targetMuscle: 'Hamstrings',
-              defaultSets: 3,
-              defaultReps: 10,
-              defaultWeightKg: 70.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Leg Extension',
-              targetMuscle: 'Quads',
-              defaultSets: 3,
-              defaultReps: 12,
-              defaultWeightKg: 45.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Hanging Leg Raises',
-              targetMuscle: 'Core',
-              defaultSets: 3,
-              defaultReps: 15,
-              defaultWeightKg: 0.0,
-            ),
-            Exercise(
-              id: _uuid.v4(),
-              name: 'Front Plank Hold',
-              targetMuscle: 'Core',
-              isTimeBased: true,
-              defaultSets: 3,
-              defaultTimeSeconds: 60,
-              defaultWeightKg: 0.0,
-              notes: 'Keep hips aligned, squeeze glutes and brace core.',
-            ),
-          ],
-        ),
-      ];
-
-      await saveAllSchedules(defaultSchedules);
-
-      // Also create one initial completed log for yesterday as a demo
-      final push = defaultSchedules[0];
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      final initialLog = WorkoutLog(
+    final defaultSchedules = [
+      WorkoutSchedule(
         id: _uuid.v4(),
-        scheduleId: push.id,
-        scheduleTitle: push.title,
-        completedDate: yesterday,
-        durationMinutes: 50,
-        overallNotes: 'Great session, felt strong on bench press.',
-        exerciseLogs: push.exercises.map((e) {
-          return ExerciseCompletionLog(
-            exerciseId: e.id,
-            exerciseName: e.name,
-            targetMuscle: e.targetMuscle,
-            sets: List.generate(
-              e.defaultSets,
-              (index) => ExerciseSetLog(
-                setNumber: index + 1,
-                reps: e.defaultReps,
-                weightKg: e.defaultWeightKg,
-                completed: true,
-              ),
+        title: 'Push Day (Chest, Shoulders, Triceps)',
+        description: 'Focus on horizontal and vertical pushing hypertrophy.',
+        colorHex: '#10B981', // Emerald
+        scheduledDays: ['Monday', 'Thursday'],
+        createdAt: DateTime.now().subtract(const Duration(days: 7)),
+        exercises: [
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Barbell Bench Press',
+            targetMuscle: 'Chest',
+            defaultSets: 4,
+            defaultReps: 8,
+            defaultWeightKg: 60.0,
+            notes: 'Keep shoulder blades retracted and elbows at 45 deg.',
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Incline Dumbbell Press',
+            targetMuscle: 'Upper Chest',
+            defaultSets: 3,
+            defaultReps: 10,
+            defaultWeightKg: 22.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Overhead Shoulder Press',
+            targetMuscle: 'Shoulders',
+            defaultSets: 3,
+            defaultReps: 10,
+            defaultWeightKg: 40.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Triceps Rope Pushdown',
+            targetMuscle: 'Triceps',
+            defaultSets: 3,
+            defaultReps: 12,
+            defaultWeightKg: 25.0,
+          ),
+        ],
+      ),
+      WorkoutSchedule(
+        id: _uuid.v4(),
+        title: 'Pull Day (Back, Rear Delts, Biceps)',
+        description: 'Vertical and horizontal pulling power and arm volume.',
+        colorHex: '#06B6D4', // Cyan
+        scheduledDays: ['Tuesday', 'Friday'],
+        createdAt: DateTime.now().subtract(const Duration(days: 6)),
+        exercises: [
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Barbell Bent-Over Row',
+            targetMuscle: 'Back',
+            defaultSets: 4,
+            defaultReps: 8,
+            defaultWeightKg: 65.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Lat Pulldown',
+            targetMuscle: 'Lats',
+            defaultSets: 3,
+            defaultReps: 10,
+            defaultWeightKg: 55.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Face Pulls',
+            targetMuscle: 'Rear Delts',
+            defaultSets: 3,
+            defaultReps: 15,
+            defaultWeightKg: 20.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Incline Dumbbell Bicep Curl',
+            targetMuscle: 'Biceps',
+            defaultSets: 3,
+            defaultReps: 12,
+            defaultWeightKg: 14.0,
+          ),
+        ],
+      ),
+      WorkoutSchedule(
+        id: _uuid.v4(),
+        title: 'Legs & Core Power',
+        description: 'Squats, posterior chain development, and core stability.',
+        colorHex: '#F59E0B', // Amber
+        scheduledDays: ['Wednesday', 'Saturday'],
+        createdAt: DateTime.now().subtract(const Duration(days: 5)),
+        exercises: [
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Barbell Back Squat',
+            targetMuscle: 'Quads & Glutes',
+            defaultSets: 4,
+            defaultReps: 8,
+            defaultWeightKg: 85.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Romanian Deadlift (RDL)',
+            targetMuscle: 'Hamstrings',
+            defaultSets: 3,
+            defaultReps: 10,
+            defaultWeightKg: 70.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Leg Extension',
+            targetMuscle: 'Quads',
+            defaultSets: 3,
+            defaultReps: 12,
+            defaultWeightKg: 45.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Hanging Leg Raises',
+            targetMuscle: 'Core',
+            defaultSets: 3,
+            defaultReps: 15,
+            defaultWeightKg: 0.0,
+          ),
+          Exercise(
+            id: _uuid.v4(),
+            name: 'Front Plank Hold',
+            targetMuscle: 'Core',
+            isTimeBased: true,
+            defaultSets: 3,
+            defaultTimeSeconds: 60,
+            defaultWeightKg: 0.0,
+            notes: 'Keep hips aligned, squeeze glutes and brace core.',
+          ),
+        ],
+      ),
+    ];
+
+    await saveAllSchedules(defaultSchedules);
+
+    // Initial demo completed log
+    final push = defaultSchedules[0];
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final initialLog = WorkoutLog(
+      id: _uuid.v4(),
+      scheduleId: push.id,
+      scheduleTitle: push.title,
+      completedDate: yesterday,
+      durationMinutes: 50,
+      overallNotes: 'Great session, felt strong on bench press.',
+      exerciseLogs: push.exercises.map((e) {
+        return ExerciseCompletionLog(
+          exerciseId: e.id,
+          exerciseName: e.name,
+          targetMuscle: e.targetMuscle,
+          sets: List.generate(
+            e.defaultSets,
+            (index) => ExerciseSetLog(
+              setNumber: index + 1,
+              reps: e.defaultReps,
+              weightKg: e.defaultWeightKg,
+              completed: true,
             ),
-          );
-        }).toList(),
-      );
-      await saveLog(initialLog);
-      await _prefs?.setBool(_keyHasSeeded, true);
+          ),
+        );
+      }).toList(),
+    );
+    await saveLog(initialLog);
+    await _prefs?.setBool(_keyHasSeeded, true);
   }
 
   // SCHEDULES
@@ -352,12 +426,10 @@ class StorageService extends ChangeNotifier {
     }
     await saveAllSchedules(list);
 
-    if (_isFirebaseReady) {
+    final schedCol = _schedulesCollection;
+    if (schedCol != null) {
       try {
-        await _firestore
-            ?.collection('schedules')
-            .doc(schedule.id)
-            .set(schedule.toJson(), SetOptions(merge: true));
+        await schedCol.doc(schedule.id).set(schedule.toJson(), SetOptions(merge: true));
       } catch (e) {
         debugPrint('Firestore saveSchedule notice: $e');
       }
@@ -369,9 +441,10 @@ class StorageService extends ChangeNotifier {
     list.removeWhere((s) => s.id == scheduleId);
     await saveAllSchedules(list);
 
-    if (_isFirebaseReady) {
+    final schedCol = _schedulesCollection;
+    if (schedCol != null) {
       try {
-        await _firestore?.collection('schedules').doc(scheduleId).delete();
+        await schedCol.doc(scheduleId).delete();
       } catch (e) {
         debugPrint('Firestore deleteSchedule notice: $e');
       }
@@ -408,12 +481,10 @@ class StorageService extends ChangeNotifier {
     }
     await saveAllLogs(list);
 
-    if (_isFirebaseReady) {
+    final logCol = _logsCollection;
+    if (logCol != null) {
       try {
-        await _firestore
-            ?.collection('logs')
-            .doc(log.id)
-            .set(log.toJson(), SetOptions(merge: true));
+        await logCol.doc(log.id).set(log.toJson(), SetOptions(merge: true));
       } catch (e) {
         debugPrint('Firestore saveLog notice: $e');
       }
@@ -425,9 +496,10 @@ class StorageService extends ChangeNotifier {
     list.removeWhere((l) => l.id == logId);
     await saveAllLogs(list);
 
-    if (_isFirebaseReady) {
+    final logCol = _logsCollection;
+    if (logCol != null) {
       try {
-        await _firestore?.collection('logs').doc(logId).delete();
+        await logCol.doc(logId).delete();
       } catch (e) {
         debugPrint('Firestore deleteLog notice: $e');
       }

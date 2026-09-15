@@ -12,7 +12,9 @@ class AppTheme {
 
   // Backgrounds & Surfaces
   static const Color bgDark = Color(0xFF0B0F17); // Deep void
+  static const Color background = bgDark;
   static const Color surfaceDark = Color(0xFF151C28); // Elevated card
+  static const Color surface = surfaceDark;
   static const Color surfaceLighter = Color(0xFF1E293B); // Pill / Input
   static const Color surfaceHighlight = Color(0xFF334155);
 
