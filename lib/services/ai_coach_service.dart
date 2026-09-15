@@ -7,11 +7,11 @@ import '../models/workout_schedule.dart';
 import '../models/user_profile.dart';
 
 class AiCoachService {
-  static const String _geminiModel = 'gemini-1.5-flash';
+  static const String _geminiModel = 'gemini-3.6-flash';
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/$_geminiModel:generateContent';
 
-  /// Generates a comprehensive AI Workout Analysis using Gemini 1.5 Flash
+  /// Generates a comprehensive AI Workout Analysis using Gemini
   static Future<String> generateWorkoutAnalysis({
     required List<WorkoutLog> logs,
     required List<WorkoutSchedule> schedules,
@@ -20,7 +20,7 @@ class AiCoachService {
     final apiKey = profile.geminiApiKey.trim();
     if (apiKey.isEmpty) {
       throw Exception(
-        'Gemini API key is not set. Please tap the Settings icon to enter your free Google Gemini API key.',
+        'Gemini API key is not set. Please tap the Settings icon to enter your Google Gemini API key.',
       );
     }
 
@@ -39,7 +39,7 @@ class AiCoachService {
     final apiKey = profile.geminiApiKey.trim();
     if (apiKey.isEmpty) {
       throw Exception(
-        'Gemini API key is not set. Please tap the Settings icon to enter your free Google Gemini API key.',
+        'Gemini API key is not set. Please tap the Settings icon to enter your Google Gemini API key.',
       );
     }
 
