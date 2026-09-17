@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/log_weight_dialog.dart';
 import 'ai_coach_screen.dart';
 
-class AnalyticsTab extends StatelessWidget {
+class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
+
+  @override
+  State<AnalyticsTab> createState() => _AnalyticsTabState();
+}
+
+class _AnalyticsTabState extends State<AnalyticsTab> {
+  bool _showHistory = false;
 
   @override
   Widget build(BuildContext context) {
@@ -228,6 +236,9 @@ class AnalyticsTab extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          // Body Composition & Weight Card
+          _buildBodyCompositionCard(context, storage),
           const SizedBox(height: 20),
           // 4 Grid Stats
           GridView.count(
@@ -487,6 +498,291 @@ class AnalyticsTab extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyCompositionCard(
+      BuildContext context, StorageService storage) {
+    final metrics = storage.getBodyMetrics();
+    final latest = storage.getLatestBodyMetric();
+    final avg7Day = storage.get7DayAverageWeight();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.surfaceHighlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.monitor_weight_outlined,
+                    color: AppTheme.secondary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Body Weight & Composition',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Scale & US Navy body fat decomposition',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final updated = await LogWeightDialog.show(context);
+                  if (updated == true) {
+                    setState(() {});
+                  }
+                },
+                icon: const Icon(Icons.add, size: 15),
+                label: const Text('Log',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondary,
+                  foregroundColor: Colors.black,
+                  visualDensity: VisualDensity.compact,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (latest == null)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLighter,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppTheme.textMuted),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No weigh-ins recorded yet. Tap "Log" to track weight, body fat %, and lean mass.',
+                      style: TextStyle(
+                          fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Current Weight & 7-Day Average
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '${latest.weightKg.toStringAsFixed(1)} kg',
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                if (avg7Day != null) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLighter,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.surfaceHighlight),
+                    ),
+                    child: Text(
+                      '7-Day Avg: ${avg7Day.toStringAsFixed(1)} kg',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                Text(
+                  DateFormat('MMM d').format(latest.date),
+                  style:
+                      const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Composition chips: Body Fat %, Lean Mass, Fat Mass
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricTile(
+                    'BODY FAT',
+                    latest.bodyFatPercentage != null
+                        ? '${latest.bodyFatPercentage!.toStringAsFixed(1)}%'
+                        : '--',
+                    AppTheme.secondary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildMetricTile(
+                    'LEAN MASS',
+                    latest.leanMassKg != null
+                        ? '${latest.leanMassKg!.toStringAsFixed(1)} kg'
+                        : '--',
+                    AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildMetricTile(
+                    'FAT MASS',
+                    latest.fatMassKg != null
+                        ? '${latest.fatMassKg!.toStringAsFixed(1)} kg'
+                        : '--',
+                    AppTheme.accentRose,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // History toggle
+            InkWell(
+              onTap: () => setState(() => _showHistory = !_showHistory),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Weigh-In History (${metrics.length})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    Icon(
+                      _showHistory
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: AppTheme.textMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showHistory) ...[
+              const Divider(height: 14, color: AppTheme.surfaceHighlight),
+              ...metrics.take(6).map((m) {
+                final dateStr = DateFormat('MMM d, yyyy').format(m.date);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        dateStr,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${m.weightKg.toStringAsFixed(1)} kg',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      if (m.bodyFatPercentage != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${m.bodyFatPercentage!.toStringAsFixed(1)}% BF)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.secondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 16, color: AppTheme.accentRose),
+                        padding: const EdgeInsets.only(left: 8),
+                        constraints: const BoxConstraints(),
+                        onPressed: () async {
+                          await storage.deleteBodyMetric(m.id);
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLighter,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.surfaceHighlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
             ),
           ),
         ],

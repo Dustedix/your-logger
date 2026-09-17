@@ -10,6 +10,7 @@ import '../models/workout_schedule.dart';
 import '../models/workout_log.dart';
 import '../models/user_profile.dart';
 import '../models/personal_record.dart';
+import '../models/body_metric_log.dart';
 
 class SyncResult {
   final bool success;
@@ -28,6 +29,7 @@ class StorageService extends ChangeNotifier {
   SharedPreferences? _prefs;
   StreamSubscription? _schedulesSub;
   StreamSubscription? _logsSub;
+  StreamSubscription? _metricsSub;
   String? _activeUser;
 
   String? get activeUser => _activeUser;
@@ -39,6 +41,10 @@ class StorageService extends ChangeNotifier {
   String get _keyLogs => _activeUser != null && _activeUser!.isNotEmpty
       ? 'workout_logs_v1_$_activeUser'
       : 'workout_logs_v1';
+
+  String get _keyBodyMetrics => _activeUser != null && _activeUser!.isNotEmpty
+      ? 'workout_body_metrics_v1_$_activeUser'
+      : 'workout_body_metrics_v1';
 
   String get _keyHasSeeded => _activeUser != null && _activeUser!.isNotEmpty
       ? 'workout_has_seeded_v1_$_activeUser'
@@ -68,6 +74,14 @@ class StorageService extends ChangeNotifier {
     return _firestore!.collection('logs');
   }
 
+  CollectionReference<Map<String, dynamic>>? get _metricsCollection {
+    if (!_isFirebaseReady || _firestore == null) return null;
+    if (_activeUser != null && _activeUser!.isNotEmpty) {
+      return _firestore!.collection('users').doc(_activeUser!).collection('body_metrics');
+    }
+    return _firestore!.collection('body_metrics');
+  }
+
   Future<void> init([String? initialUser]) async {
     _prefs ??= await SharedPreferences.getInstance();
     _activeUser = initialUser?.trim().toLowerCase();
@@ -81,6 +95,7 @@ class StorageService extends ChangeNotifier {
   Future<void> switchUser(String? username) async {
     _schedulesSub?.cancel();
     _logsSub?.cancel();
+    _metricsSub?.cancel();
     _activeUser = username?.trim().toLowerCase();
 
     if (_activeUser != null && _activeUser!.isNotEmpty) {
@@ -111,6 +126,7 @@ class StorageService extends ChangeNotifier {
     if (!_isFirebaseReady) return;
     _schedulesSub?.cancel();
     _logsSub?.cancel();
+    _metricsSub?.cancel();
 
     final schedCol = _schedulesCollection;
     if (schedCol != null) {
@@ -148,6 +164,24 @@ class StorageService extends ChangeNotifier {
         },
       );
     }
+
+    final metricsCol = _metricsCollection;
+    if (metricsCol != null) {
+      _metricsSub = metricsCol.snapshots().listen(
+        (snapshot) {
+          final cloudMetrics = snapshot.docs
+              .map((doc) => BodyMetricLog.fromJson(doc.data()))
+              .toList();
+          cloudMetrics.sort((a, b) => b.date.compareTo(a.date));
+          final encoded = jsonEncode(cloudMetrics.map((m) => m.toJson()).toList());
+          _prefs?.setString(_keyBodyMetrics, encoded);
+          notifyListeners();
+        },
+        onError: (e) {
+          debugPrint('Firestore realtime body_metrics notice: $e');
+        },
+      );
+    }
   }
 
   /// Pushes all local schedules and logs to Cloud Firestore with error reporting
@@ -174,6 +208,15 @@ class StorageService extends ChangeNotifier {
         final logs = getLogs();
         for (final l in logs) {
           await logCol.doc(l.id).set(l.toJson(), SetOptions(merge: true));
+          count++;
+        }
+      }
+
+      final metricsCol = _metricsCollection;
+      if (metricsCol != null) {
+        final metrics = getBodyMetrics();
+        for (final m in metrics) {
+          await metricsCol.doc(m.id).set(m.toJson(), SetOptions(merge: true));
           count++;
         }
       }
@@ -210,6 +253,17 @@ class StorageService extends ChangeNotifier {
               .map((doc) => WorkoutLog.fromJson(doc.data()))
               .toList();
           await saveAllLogs(cloudLogs);
+        }
+      }
+
+      final metricsCol = _metricsCollection;
+      if (metricsCol != null) {
+        final metricSnap = await metricsCol.get();
+        if (metricSnap.docs.isNotEmpty) {
+          final cloudMetrics = metricSnap.docs
+              .map((doc) => BodyMetricLog.fromJson(doc.data()))
+              .toList();
+          await saveAllBodyMetrics(cloudMetrics);
         }
       }
     } catch (e) {
@@ -516,10 +570,101 @@ class StorageService extends ChangeNotifier {
     await saveAllLogs([]);
   }
 
+  /// Clears all body metrics locally (used for testing or resetting data)
+  Future<void> clearAllBodyMetrics() async {
+    await saveAllBodyMetrics([]);
+  }
+
   /// Epley 1RM formula calculation
   static double calculateEpley1RM(double weightKg, int reps) {
     if (reps <= 1) return weightKg;
     return weightKg * (1 + (reps / 30.0));
+  }
+
+  // BODY WEIGHT & COMPOSITION METRICS
+
+  /// Retrieves all body metric logs sorted by date descending
+  List<BodyMetricLog> getBodyMetrics() {
+    final jsonStr = _prefs?.getString(_keyBodyMetrics);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      final List<dynamic> list = jsonDecode(jsonStr);
+      final metrics = list
+          .map((item) => BodyMetricLog.fromJson(item as Map<String, dynamic>))
+          .toList();
+      metrics.sort((a, b) => b.date.compareTo(a.date));
+      return metrics;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Saves full list of body metrics locally
+  Future<void> saveAllBodyMetrics(List<BodyMetricLog> metrics) async {
+    metrics.sort((a, b) => b.date.compareTo(a.date));
+    final encoded = jsonEncode(metrics.map((m) => m.toJson()).toList());
+    await _prefs?.setString(_keyBodyMetrics, encoded);
+    notifyListeners();
+  }
+
+  /// Saves or updates a single body metric log and syncs to Firestore
+  Future<void> saveBodyMetric(BodyMetricLog metric) async {
+    final metrics = getBodyMetrics();
+    final index = metrics.indexWhere((m) => m.id == metric.id);
+    if (index >= 0) {
+      metrics[index] = metric;
+    } else {
+      metrics.insert(0, metric);
+    }
+    await saveAllBodyMetrics(metrics);
+
+    // Keep latest weight synchronized with UserProfile
+    if (metric.weightKg > 0) {
+      final profile = getProfile();
+      await saveProfile(profile.copyWith(bodyWeightKg: metric.weightKg));
+    }
+
+    final col = _metricsCollection;
+    if (col != null) {
+      try {
+        await col.doc(metric.id).set(metric.toJson(), SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Firestore saveBodyMetric error: $e');
+      }
+    }
+  }
+
+  /// Deletes a body metric log locally and in Firestore
+  Future<void> deleteBodyMetric(String metricId) async {
+    final metrics = getBodyMetrics()..removeWhere((m) => m.id == metricId);
+    await saveAllBodyMetrics(metrics);
+
+    final col = _metricsCollection;
+    if (col != null) {
+      try {
+        await col.doc(metricId).delete();
+      } catch (e) {
+        debugPrint('Firestore deleteBodyMetric error: $e');
+      }
+    }
+  }
+
+  /// Returns the most recent body metric log
+  BodyMetricLog? getLatestBodyMetric() {
+    final metrics = getBodyMetrics();
+    return metrics.isNotEmpty ? metrics.first : null;
+  }
+
+  /// Calculates rolling 7-day average weight in kg
+  double? get7DayAverageWeight() {
+    final metrics = getBodyMetrics();
+    if (metrics.isEmpty) return null;
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    final recent =
+        metrics.where((m) => m.date.isAfter(cutoff) && m.weightKg > 0).toList();
+    if (recent.isEmpty) return metrics.first.weightKg;
+    final sum = recent.fold(0.0, (acc, m) => acc + m.weightKg);
+    return sum / recent.length;
   }
 
   // USER PROFILE & AI SETTINGS

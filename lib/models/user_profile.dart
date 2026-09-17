@@ -1,5 +1,7 @@
 class UserProfile {
   final double? bodyWeightKg;
+  final double? heightCm;
+  final String gender; // 'Male' or 'Female'
   final int? age;
   final String trainingGoal;
   final String experienceLevel;
@@ -9,6 +11,8 @@ class UserProfile {
 
   const UserProfile({
     this.bodyWeightKg,
+    this.heightCm,
+    this.gender = 'Male',
     this.age,
     this.trainingGoal = 'Hypertrophy & Muscle Building',
     this.experienceLevel = 'Intermediate',
@@ -19,6 +23,8 @@ class UserProfile {
 
   UserProfile copyWith({
     double? bodyWeightKg,
+    double? heightCm,
+    String? gender,
     int? age,
     String? trainingGoal,
     String? experienceLevel,
@@ -28,6 +34,8 @@ class UserProfile {
   }) {
     return UserProfile(
       bodyWeightKg: bodyWeightKg ?? this.bodyWeightKg,
+      heightCm: heightCm ?? this.heightCm,
+      gender: gender ?? this.gender,
       age: age ?? this.age,
       trainingGoal: trainingGoal ?? this.trainingGoal,
       experienceLevel: experienceLevel ?? this.experienceLevel,
@@ -40,6 +48,8 @@ class UserProfile {
   Map<String, dynamic> toJson() {
     return {
       'bodyWeightKg': bodyWeightKg,
+      'heightCm': heightCm,
+      'gender': gender,
       'age': age,
       'trainingGoal': trainingGoal,
       'experienceLevel': experienceLevel,
@@ -54,6 +64,10 @@ class UserProfile {
       bodyWeightKg: json['bodyWeightKg'] != null
           ? (json['bodyWeightKg'] as num).toDouble()
           : null,
+      heightCm: json['heightCm'] != null
+          ? (json['heightCm'] as num).toDouble()
+          : null,
+      gender: json['gender'] as String? ?? 'Male',
       age: json['age'] as int?,
       trainingGoal: json['trainingGoal'] as String? ??
           'Hypertrophy & Muscle Building',
