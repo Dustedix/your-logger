@@ -14,6 +14,42 @@ class ScheduleEditorScreen extends StatefulWidget {
   State<ScheduleEditorScreen> createState() => _ScheduleEditorScreenState();
 }
 
+class _SubMovementDraft {
+  final TextEditingController nameCtrl;
+  final TextEditingController muscleCtrl;
+  final TextEditingController repsCtrl;
+  final TextEditingController timeCtrl;
+  final TextEditingController weightCtrl;
+  bool isTimeBased;
+
+  _SubMovementDraft({
+    String name = '',
+    String muscle = 'General',
+    int reps = 10,
+    int timeSeconds = 60,
+    double weightKg = 0.0,
+    this.isTimeBased = false,
+  })  : nameCtrl = TextEditingController(text: name),
+        muscleCtrl = TextEditingController(text: muscle),
+        repsCtrl = TextEditingController(text: reps.toString()),
+        timeCtrl = TextEditingController(text: timeSeconds.toString()),
+        weightCtrl = TextEditingController(
+          text: weightKg == 0
+              ? '0'
+              : (weightKg % 1 == 0
+                  ? weightKg.toInt().toString()
+                  : weightKg.toString()),
+        );
+
+  void dispose() {
+    nameCtrl.dispose();
+    muscleCtrl.dispose();
+    repsCtrl.dispose();
+    timeCtrl.dispose();
+    weightCtrl.dispose();
+  }
+}
+
 class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   final _formKey = GlobalKey<FormState>();
   static final _uuid = const Uuid();
@@ -76,10 +112,179 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     super.dispose();
   }
 
+  Widget _buildSubMovementDraftCard({
+    required _SubMovementDraft draft,
+    required int index,
+    required int totalDrafts,
+    required VoidCallback onRemove,
+    required void Function(VoidCallback) setDialogState,
+  }) {
+    final movNum = index + 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: AppTheme.surfaceHighlight),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.accentAmber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt, size: 13, color: AppTheme.accentAmber),
+                  const SizedBox(width: 4),
+                  Text(
+                    'MOVEMENT $movNum (BACK-TO-BACK)',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentAmber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            if (totalDrafts > 1)
+              IconButton(
+                tooltip: 'Remove Movement $movNum',
+                icon: const Icon(Icons.close, size: 16, color: AppTheme.accentRose),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: onRemove,
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: draft.nameCtrl,
+          decoration: InputDecoration(
+            labelText: 'Movement $movNum Name',
+            hintText: movNum == 2
+                ? 'e.g. Triceps Pushdowns'
+                : 'e.g. Lateral Raises, Planks',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: draft.muscleCtrl,
+          decoration: InputDecoration(
+            labelText: 'Movement $movNum Target Muscle',
+            hintText: 'e.g. Triceps, Delts, Core',
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Movement Type Selector
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => setDialogState(() => draft.isTimeBased = false),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: !draft.isTimeBased
+                        ? AppTheme.accentAmber.withValues(alpha: 0.15)
+                        : AppTheme.surfaceLighter,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: !draft.isTimeBased
+                          ? AppTheme.accentAmber
+                          : AppTheme.surfaceHighlight,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Reps & Sets',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: !draft.isTimeBased
+                            ? AppTheme.accentAmber
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: () => setDialogState(() => draft.isTimeBased = true),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: draft.isTimeBased
+                        ? AppTheme.secondary.withValues(alpha: 0.15)
+                        : AppTheme.surfaceLighter,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: draft.isTimeBased
+                          ? AppTheme.secondary
+                          : AppTheme.surfaceHighlight,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Timed Hold',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: draft.isTimeBased
+                            ? AppTheme.secondary
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: draft.isTimeBased ? draft.timeCtrl : draft.repsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: draft.isTimeBased ? 'Hold (s)' : 'Reps',
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: draft.weightCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Weight (kg)',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   void _showAddExerciseDialog({Exercise? existing, int? editIndex}) {
     bool isSuperset = existing?.isSuperset ?? false;
 
-    // Movement A controllers
+    // Movement 1 (Primary) controllers
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final muscleCtrl =
         TextEditingController(text: existing?.targetMuscle ?? 'General');
@@ -93,18 +298,34 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
         text: (existing?.defaultWeightKg ?? 0.0).toString());
     bool isTimeBased = existing?.isTimeBased ?? false;
 
-    // Movement B (Superset) controllers
-    final supersetNameCtrl =
-        TextEditingController(text: existing?.supersetName ?? '');
-    final supersetMuscleCtrl = TextEditingController(
-        text: existing?.supersetTargetMuscle ?? 'General');
-    final supersetRepsCtrl = TextEditingController(
-        text: (existing?.supersetReps ?? 10).toString());
-    final supersetTimeCtrl = TextEditingController(
-        text: (existing?.supersetTimeSeconds ?? 60).toString());
-    final supersetWeightCtrl = TextEditingController(
-        text: (existing?.supersetWeightKg ?? 0.0).toString());
-    bool supersetIsTimeBased = existing?.supersetIsTimeBased ?? false;
+    // Sub-movements (Movement 2, 3, etc.) drafts
+    final drafts = <_SubMovementDraft>[];
+    if (existing != null && existing.isSuperset) {
+      if (existing.supersetMovements.isNotEmpty) {
+        for (final sm in existing.supersetMovements) {
+          drafts.add(_SubMovementDraft(
+            name: sm.name,
+            muscle: sm.targetMuscle,
+            reps: sm.defaultReps,
+            timeSeconds: sm.defaultTimeSeconds,
+            weightKg: sm.defaultWeightKg,
+            isTimeBased: sm.isTimeBased,
+          ));
+        }
+      } else if (existing.supersetName?.isNotEmpty ?? false) {
+        drafts.add(_SubMovementDraft(
+          name: existing.supersetName!,
+          muscle: existing.supersetTargetMuscle ?? 'General',
+          reps: existing.supersetReps ?? 10,
+          timeSeconds: existing.supersetTimeSeconds ?? 60,
+          weightKg: existing.supersetWeightKg ?? 0.0,
+          isTimeBased: existing.supersetIsTimeBased,
+        ));
+      }
+    }
+    if (isSuperset && drafts.isEmpty) {
+      drafts.add(_SubMovementDraft(name: '', muscle: 'General'));
+    }
 
     showDialog(
       context: context,
@@ -130,7 +351,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Mode Switcher: Normal vs Superset
+                      // Mode Switcher: Normal vs Superset / Paired
                       const Text(
                         'Workout Structure',
                         style: TextStyle(
@@ -186,7 +407,15 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: InkWell(
-                              onTap: () => setDialogState(() => isSuperset = true),
+                              onTap: () {
+                                setDialogState(() {
+                                  isSuperset = true;
+                                  if (drafts.isEmpty) {
+                                    drafts.add(_SubMovementDraft(
+                                        name: '', muscle: 'General'));
+                                  }
+                                });
+                              },
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -211,7 +440,11 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                             : AppTheme.textMuted),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '⚡ Superset (Pair)',
+                                      drafts.length <= 1
+                                          ? '⚡ Superset (Pair)'
+                                          : (drafts.length == 2
+                                              ? '⚡ Tri-Set (3)'
+                                              : '⚡ Giant Set (${drafts.length + 1})'),
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -229,7 +462,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Section Header for Movement A
+                      // Section Header for Movement 1
                       if (isSuperset) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -374,159 +607,48 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         ],
                       ),
 
-                      // If Superset is enabled: MOVEMENT 2 SECTION
+                      // If Superset is enabled: ARBITRARY SUB-MOVEMENTS (2, 3, 4+)
                       if (isSuperset) ...[
-                        const SizedBox(height: 18),
-                        const Divider(
-                            height: 1, color: AppTheme.surfaceHighlight),
+                        for (int i = 0; i < drafts.length; i++)
+                          _buildSubMovementDraftCard(
+                            draft: drafts[i],
+                            index: i,
+                            totalDrafts: drafts.length,
+                            onRemove: () {
+                              setDialogState(() {
+                                final removed = drafts.removeAt(i);
+                                removed.dispose();
+                              });
+                            },
+                            setDialogState: setDialogState,
+                          ),
                         const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentAmber.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.bolt,
-                                  size: 13, color: AppTheme.accentAmber),
-                              SizedBox(width: 4),
-                              Text(
-                                'MOVEMENT 2 (BACK-TO-BACK)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.accentAmber,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supersetNameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Movement 2 Name',
-                            hintText: 'e.g. Triceps Pushdowns',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: supersetMuscleCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Movement 2 Target Muscle',
-                            hintText: 'e.g. Triceps',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Movement 2 Type Selector
-                        Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setDialogState(
-                                    () => supersetIsTimeBased = false),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: !supersetIsTimeBased
-                                        ? AppTheme.accentAmber
-                                            .withValues(alpha: 0.15)
-                                        : AppTheme.surfaceLighter,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: !supersetIsTimeBased
-                                          ? AppTheme.accentAmber
-                                          : AppTheme.surfaceHighlight,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      'Reps & Sets',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: !supersetIsTimeBased
-                                            ? AppTheme.accentAmber
-                                            : AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setDialogState(() {
+                              drafts.add(_SubMovementDraft(
+                                  name: '', muscle: 'General'));
+                            });
+                          },
+                          icon: const Icon(Icons.add,
+                              size: 16, color: AppTheme.accentAmber),
+                          label: Text(
+                            '+ Add Movement ${drafts.length + 2} (${drafts.length == 1 ? "Make Tri-Set" : "Giant Set"})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentAmber,
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setDialogState(
-                                    () => supersetIsTimeBased = true),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: supersetIsTimeBased
-                                        ? AppTheme.secondary
-                                            .withValues(alpha: 0.15)
-                                        : AppTheme.surfaceLighter,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: supersetIsTimeBased
-                                          ? AppTheme.secondary
-                                          : AppTheme.surfaceHighlight,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      'Timed Hold',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: supersetIsTimeBased
-                                            ? AppTheme.secondary
-                                            : AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: supersetIsTimeBased
-                                    ? supersetTimeCtrl
-                                    : supersetRepsCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: supersetIsTimeBased
-                                      ? 'Hold (s)'
-                                      : 'Reps',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: supersetWeightCtrl,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                        decimal: true),
-                                decoration: const InputDecoration(
-                                  labelText: 'Weight (kg)',
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color: AppTheme.accentAmber
+                                    .withValues(alpha: 0.5)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 12),
+                          ),
                         ),
                       ],
 
@@ -535,13 +657,13 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           height: 1, color: AppTheme.surfaceHighlight),
                       const SizedBox(height: 14),
 
-                      // Shared Total Sets
+                      // Shared Total Sets / Rounds
                       TextField(
                         controller: setsCtrl,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: isSuperset
-                              ? 'Total Superset Rounds / Sets'
+                              ? 'Total Paired / Superset Rounds'
                               : 'Total Sets',
                           hintText: '3',
                         ),
@@ -574,15 +696,28 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         ? 'General'
                         : muscleCtrl.text.trim();
 
-                    // Superset data
-                    final sName = supersetNameCtrl.text.trim();
-                    final sMuscle = supersetMuscleCtrl.text.trim().isEmpty
-                        ? 'General'
-                        : supersetMuscleCtrl.text.trim();
-                    final sReps = int.tryParse(supersetRepsCtrl.text) ?? 10;
-                    final sTime = int.tryParse(supersetTimeCtrl.text) ?? 60;
-                    final sWeight =
-                        double.tryParse(supersetWeightCtrl.text) ?? 0.0;
+                    // Map drafts to SupersetMovement objects
+                    final subMovements = drafts.map((d) {
+                      final sName = d.nameCtrl.text.trim();
+                      final sMuscle = d.muscleCtrl.text.trim().isEmpty
+                          ? 'General'
+                          : d.muscleCtrl.text.trim();
+                      final sReps = int.tryParse(d.repsCtrl.text) ?? 10;
+                      final sTime = int.tryParse(d.timeCtrl.text) ?? 60;
+                      final sWeight = double.tryParse(d.weightCtrl.text) ?? 0.0;
+                      return SupersetMovement(
+                        id: _uuid.v4(),
+                        name: sName.isNotEmpty ? sName : 'Movement',
+                        targetMuscle: sMuscle,
+                        isTimeBased: d.isTimeBased,
+                        defaultReps: sReps,
+                        defaultTimeSeconds: sTime,
+                        defaultWeightKg: sWeight,
+                      );
+                    }).toList();
+
+                    final hasSubMovements =
+                        isSuperset && subMovements.isNotEmpty;
 
                     setState(() {
                       final newEx = Exercise(
@@ -594,13 +729,27 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         defaultReps: reps,
                         defaultTimeSeconds: time,
                         defaultWeightKg: weight,
-                        isSuperset: isSuperset,
-                        supersetName: isSuperset ? sName : null,
-                        supersetTargetMuscle: isSuperset ? sMuscle : null,
-                        supersetIsTimeBased: supersetIsTimeBased,
-                        supersetReps: sReps,
-                        supersetTimeSeconds: sTime,
-                        supersetWeightKg: sWeight,
+                        isSuperset: hasSubMovements,
+                        supersetMovements:
+                            hasSubMovements ? subMovements : const [],
+                        supersetName: hasSubMovements
+                            ? subMovements.first.name
+                            : null,
+                        supersetTargetMuscle: hasSubMovements
+                            ? subMovements.first.targetMuscle
+                            : null,
+                        supersetIsTimeBased: hasSubMovements
+                            ? subMovements.first.isTimeBased
+                            : false,
+                        supersetReps: hasSubMovements
+                            ? subMovements.first.defaultReps
+                            : null,
+                        supersetTimeSeconds: hasSubMovements
+                            ? subMovements.first.defaultTimeSeconds
+                            : null,
+                        supersetWeightKg: hasSubMovements
+                            ? subMovements.first.defaultWeightKg
+                            : null,
                       );
 
                       if (editIndex != null) {
@@ -612,7 +761,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     Navigator.pop(ctx);
                   },
                   child: Text(
-                    isSuperset ? 'Save Superset' : 'Save Exercise',
+                    isSuperset ? 'Save Paired Routine' : 'Save Exercise',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -895,7 +1044,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                   Flexible(
                                     child: Text(
                                       ex.isSuperset
-                                          ? '${ex.name} + ${ex.supersetName?.isNotEmpty == true ? ex.supersetName : "Movement 2"}'
+                                          ? ex.allExerciseNames.join(' + ')
                                           : ex.name,
                                       style: TextStyle(
                                         fontSize: 15,
@@ -920,9 +1069,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                             color: AppTheme.accentAmber
                                                 .withValues(alpha: 0.4)),
                                       ),
-                                      child: const Text(
-                                        'SUPERSET',
-                                        style: TextStyle(
+                                      child: Text(
+                                        ex.supersetBadgeTitle.toUpperCase(),
+                                        style: const TextStyle(
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                           color: AppTheme.accentAmber,
@@ -935,7 +1084,13 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 ex.isSuperset
-                                    ? '${ex.defaultSets} rounds • 1: ${ex.targetMuscle} (${ex.isTimeBased ? "${ex.defaultTimeSeconds}s" : "${ex.defaultReps}r"}${ex.defaultWeightKg > 0 ? " @ ${ex.defaultWeightKg}kg" : ""}) + 2: ${ex.supersetTargetMuscle ?? "General"} (${ex.supersetIsTimeBased ? "${ex.supersetTimeSeconds ?? 60}s" : "${ex.supersetReps ?? 10}r"}${(ex.supersetWeightKg ?? 0) > 0 ? " @ ${ex.supersetWeightKg}kg" : ""})'
+                                    ? '${ex.defaultSets} rounds • ${[
+                                        '1: ${ex.targetMuscle} (${ex.isTimeBased ? "${ex.defaultTimeSeconds}s" : "${ex.defaultReps}r"}${ex.defaultWeightKg > 0 ? " @ ${ex.defaultWeightKg}kg" : ""})',
+                                        for (int m = 0;
+                                            m < ex.supersetMovements.length;
+                                            m++)
+                                          '${m + 2}: ${ex.supersetMovements[m].targetMuscle} (${ex.supersetMovements[m].isTimeBased ? "${ex.supersetMovements[m].defaultTimeSeconds}s" : "${ex.supersetMovements[m].defaultReps}r"}${ex.supersetMovements[m].defaultWeightKg > 0 ? " @ ${ex.supersetMovements[m].defaultWeightKg}kg" : ""})',
+                                      ].join(' + ')}'
                                     : (ex.isTimeBased
                                         ? '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultTimeSeconds}s hold ${ex.defaultWeightKg > 0 ? '(+${ex.defaultWeightKg}kg)' : ''}'
                                         : '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultReps} reps • ${ex.defaultWeightKg}kg'),

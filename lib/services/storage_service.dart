@@ -698,21 +698,19 @@ class StorageService extends ChangeNotifier {
     for (final log in logs) {
       for (final ex in log.exerciseLogs) {
         final matchesPrimary = ex.exerciseName.trim().toLowerCase() == cleanName;
-        final matchesSuper = ex.isSuperset &&
-            (ex.supersetName?.trim().toLowerCase() == cleanName);
+        final subMovementIndex = ex.isSuperset
+            ? ex.supersetMovements.indexWhere(
+                (m) => m.name.trim().toLowerCase() == cleanName)
+            : -1;
 
-        if (matchesPrimary || matchesSuper) {
+        if (matchesPrimary) {
           final setPerformances = ex.sets.where((s) => s.completed).map((s) {
             return ExerciseSetPerformance(
               setNumber: s.setNumber,
               reps: s.reps,
               timeSeconds: s.timeSeconds,
               weightKg: s.weightKg,
-              supersetReps: s.supersetReps,
-              supersetTimeSeconds: s.supersetTimeSeconds,
-              supersetWeightKg: s.supersetWeightKg,
               isTimeBased: ex.isTimeBased,
-              supersetIsTimeBased: ex.supersetIsTimeBased,
             );
           }).toList();
 
@@ -724,6 +722,31 @@ class StorageService extends ChangeNotifier {
               sets: setPerformances,
               isSuperset: ex.isSuperset,
               supersetName: ex.supersetName,
+            );
+          }
+        } else if (subMovementIndex >= 0) {
+          final subMovement = ex.supersetMovements[subMovementIndex];
+          final setPerformances = ex.sets.where((s) => s.completed).map((s) {
+            final subSet = subMovementIndex < s.subMovements.length
+                ? s.subMovements[subMovementIndex]
+                : null;
+            return ExerciseSetPerformance(
+              setNumber: s.setNumber,
+              reps: subSet?.reps ?? 0,
+              timeSeconds: subSet?.timeSeconds ?? 0,
+              weightKg: subSet?.weightKg ?? 0.0,
+              isTimeBased: subMovement.isTimeBased,
+            );
+          }).toList();
+
+          if (setPerformances.isNotEmpty) {
+            return ExerciseLastPerformance(
+              exerciseName: subMovement.name,
+              completedDate: log.completedDate,
+              routineTitle: log.scheduleTitle,
+              sets: setPerformances,
+              isSuperset: true,
+              supersetName: subMovement.name,
             );
           }
         }
@@ -773,32 +796,42 @@ class StorageService extends ChangeNotifier {
               }
             }
           }
-        } else if (ex.isSuperset && ex.supersetName?.trim().toLowerCase() == cleanName) {
-          isTimeBased = ex.supersetIsTimeBased;
-          for (final s in ex.sets) {
-            if (!s.completed) continue;
+        }
 
-            if (ex.supersetIsTimeBased) {
-              if (s.supersetTimeSeconds > maxHoldSeconds ||
-                  (s.supersetTimeSeconds == maxHoldSeconds && s.supersetWeightKg > maxWeight)) {
-                maxHoldSeconds = s.supersetTimeSeconds;
-                maxWeight = s.supersetWeightKg;
-                recordDate = log.completedDate;
-              }
-            } else {
-              final epley1RM = s.supersetReps > 1
-                  ? s.supersetWeightKg * (1 + (s.supersetReps / 30.0))
-                  : s.supersetWeightKg;
+        if (ex.isSuperset) {
+          for (int i = 0; i < ex.supersetMovements.length; i++) {
+            final subM = ex.supersetMovements[i];
+            if (subM.name.trim().toLowerCase() == cleanName) {
+              isTimeBased = subM.isTimeBased;
+              for (final s in ex.sets) {
+                if (!s.completed || i >= s.subMovements.length) continue;
+                final subSet = s.subMovements[i];
 
-              if (s.supersetWeightKg > maxWeight ||
-                  (s.supersetWeightKg == maxWeight && s.supersetReps > maxWeightReps)) {
-                maxWeight = s.supersetWeightKg;
-                maxWeightReps = s.supersetReps;
-                recordDate = log.completedDate;
-              }
+                if (subM.isTimeBased) {
+                  if (subSet.timeSeconds > maxHoldSeconds ||
+                      (subSet.timeSeconds == maxHoldSeconds &&
+                          subSet.weightKg > maxWeight)) {
+                    maxHoldSeconds = subSet.timeSeconds;
+                    maxWeight = subSet.weightKg;
+                    recordDate = log.completedDate;
+                  }
+                } else {
+                  final epley1RM = subSet.reps > 1
+                      ? subSet.weightKg * (1 + (subSet.reps / 30.0))
+                      : subSet.weightKg;
 
-              if (epley1RM > maxEstimated1RM) {
-                maxEstimated1RM = epley1RM;
+                  if (subSet.weightKg > maxWeight ||
+                      (subSet.weightKg == maxWeight &&
+                          subSet.reps > maxWeightReps)) {
+                    maxWeight = subSet.weightKg;
+                    maxWeightReps = subSet.reps;
+                    recordDate = log.completedDate;
+                  }
+
+                  if (epley1RM > maxEstimated1RM) {
+                    maxEstimated1RM = epley1RM;
+                  }
+                }
               }
             }
           }
@@ -854,8 +887,12 @@ class StorageService extends ChangeNotifier {
         if (ex.exerciseName.trim().isNotEmpty) {
           exerciseNames.add(ex.exerciseName.trim());
         }
-        if (ex.isSuperset && (ex.supersetName?.trim().isNotEmpty ?? false)) {
-          exerciseNames.add(ex.supersetName!.trim());
+        if (ex.isSuperset) {
+          for (final m in ex.supersetMovements) {
+            if (m.name.trim().isNotEmpty) {
+              exerciseNames.add(m.name.trim());
+            }
+          }
         }
       }
     }

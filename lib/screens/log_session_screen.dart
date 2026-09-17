@@ -64,8 +64,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     return ctrl;
   }
 
-  TextEditingController _getSuperWeightCtrl(int exIdx, int setIdx, double val) {
-    final k = 'sw_${exIdx}_$setIdx';
+  TextEditingController _getSubMovementWeightCtrl(
+      int exIdx, int setIdx, int mIdx, double val) {
+    final k = 'smw_${exIdx}_${setIdx}_$mIdx';
     var ctrl = _controllers[k];
     if (ctrl == null) {
       ctrl = TextEditingController(
@@ -78,8 +79,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     return ctrl;
   }
 
-  TextEditingController _getSuperRepsCtrl(int exIdx, int setIdx, int val) {
-    final k = 'sr_${exIdx}_$setIdx';
+  TextEditingController _getSubMovementRepsCtrl(
+      int exIdx, int setIdx, int mIdx, int val) {
+    final k = 'smr_${exIdx}_${setIdx}_$mIdx';
     var ctrl = _controllers[k];
     if (ctrl == null) {
       ctrl = TextEditingController(text: val.toString());
@@ -88,8 +90,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     return ctrl;
   }
 
-  TextEditingController _getSuperTimeCtrl(int exIdx, int setIdx, int val) {
-    final k = 'st_${exIdx}_$setIdx';
+  TextEditingController _getSubMovementTimeCtrl(
+      int exIdx, int setIdx, int mIdx, int val) {
+    final k = 'smt_${exIdx}_${setIdx}_$mIdx';
     var ctrl = _controllers[k];
     if (ctrl == null) {
       ctrl = TextEditingController(text: '${val}s');
@@ -97,6 +100,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     }
     return ctrl;
   }
+
 
   @override
   void initState() {
@@ -112,6 +116,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
         supersetName: exercise.supersetName,
         supersetTargetMuscle: exercise.supersetTargetMuscle,
         supersetIsTimeBased: exercise.supersetIsTimeBased,
+        supersetMovements: exercise.supersetMovements,
         sets: List.generate(
           exercise.defaultSets > 0 ? exercise.defaultSets : 3,
           (index) => ExerciseSetLog(
@@ -122,6 +127,19 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                 : 60,
             weightKg: exercise.defaultWeightKg,
             completed: true,
+            subMovements: exercise.supersetMovements.map((sm) {
+              return SubMovementSetLog(
+                movementId: sm.id,
+                name: sm.name,
+                targetMuscle: sm.targetMuscle,
+                isTimeBased: sm.isTimeBased,
+                reps: sm.defaultReps > 0 ? sm.defaultReps : 10,
+                timeSeconds:
+                    sm.defaultTimeSeconds > 0 ? sm.defaultTimeSeconds : 60,
+                weightKg: sm.defaultWeightKg,
+                completed: true,
+              );
+            }).toList(),
             supersetReps: (exercise.supersetReps ?? 0) > 0
                 ? exercise.supersetReps!
                 : 10,
@@ -143,11 +161,21 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
       _lastPerformanceCache[key] = storage.getLastPerformance(exercise.name);
       _prCache[key] = storage.getPersonalRecord(exercise.name);
 
-      if (exercise.isSuperset && (exercise.supersetName?.isNotEmpty ?? false)) {
-        final sKey = exercise.supersetName!.trim().toLowerCase();
-        _lastPerformanceCache[sKey] =
-            storage.getLastPerformance(exercise.supersetName!);
-        _prCache[sKey] = storage.getPersonalRecord(exercise.supersetName!);
+      if (exercise.isSuperset) {
+        for (final sm in exercise.supersetMovements) {
+          if (sm.name.trim().isNotEmpty) {
+            final sKey = sm.name.trim().toLowerCase();
+            _lastPerformanceCache[sKey] = storage.getLastPerformance(sm.name);
+            _prCache[sKey] = storage.getPersonalRecord(sm.name);
+          }
+        }
+        if (exercise.supersetName?.isNotEmpty ?? false) {
+          final legacyKey = exercise.supersetName!.trim().toLowerCase();
+          _lastPerformanceCache[legacyKey] =
+              storage.getLastPerformance(exercise.supersetName!);
+          _prCache[legacyKey] =
+              storage.getPersonalRecord(exercise.supersetName!);
+        }
       }
     }
   }
@@ -188,26 +216,21 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     }
   }
 
-  String? _formatLastSuperSetText(
-      String superName, int setIndex, bool isTimeBased) {
-    final lastPerf = _lastPerformanceCache[superName.trim().toLowerCase()];
+  String? _formatLastSubMovementSetText(
+      String subName, int setIndex, bool isTimeBased) {
+    final lastPerf = _lastPerformanceCache[subName.trim().toLowerCase()];
     if (lastPerf == null || lastPerf.sets.isEmpty) return null;
 
     final set = lastPerf.getSet(setIndex) ?? lastPerf.sets.last;
     if (isTimeBased) {
-      final t = set.supersetTimeSeconds > 0
-          ? set.supersetTimeSeconds
-          : set.timeSeconds;
-      final w =
-          set.supersetWeightKg > 0 ? set.supersetWeightKg : set.weightKg;
-      final wStr = w > 0 ? ' (+${w % 1 == 0 ? w.toInt() : w}kg)' : '';
-      return 'Last: ${t}s$wStr';
+      final t = set.timeSeconds;
+      final w = set.weightKg > 0
+          ? ' (+${set.weightKg % 1 == 0 ? set.weightKg.toInt() : set.weightKg}kg)'
+          : '';
+      return 'Last: ${t}s$w';
     } else {
-      final r = set.supersetReps > 0 ? set.supersetReps : set.reps;
-      final w =
-          set.supersetWeightKg > 0 ? set.supersetWeightKg : set.weightKg;
-      final wStr = w % 1 == 0 ? w.toInt() : w;
-      return 'Last: ${wStr}kg × $r';
+      final w = set.weightKg % 1 == 0 ? set.weightKg.toInt() : set.weightKg;
+      return 'Last: ${w}kg × ${set.reps}';
     }
   }
 
@@ -344,7 +367,8 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
 
   void _addSetToExercise(int exerciseIndex) {
     setState(() {
-      final currentSets = _exerciseLogs[exerciseIndex].sets;
+      final exLog = _exerciseLogs[exerciseIndex];
+      final currentSets = exLog.sets;
       final lastReps = currentSets.isNotEmpty ? currentSets.last.reps : 10;
       final lastTime =
           currentSets.isNotEmpty ? currentSets.last.timeSeconds : 60;
@@ -356,6 +380,41 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           currentSets.isNotEmpty ? currentSets.last.supersetTimeSeconds : 60;
       final lastSuperWeight =
           currentSets.isNotEmpty ? currentSets.last.supersetWeightKg : 0.0;
+
+      final newSubMovements = <SubMovementSetLog>[];
+      if (currentSets.isNotEmpty && currentSets.last.subMovements.isNotEmpty) {
+        for (final sm in currentSets.last.subMovements) {
+          newSubMovements.add(
+            SubMovementSetLog(
+              movementId: sm.movementId,
+              name: sm.name,
+              targetMuscle: sm.targetMuscle,
+              isTimeBased: sm.isTimeBased,
+              reps: sm.reps,
+              timeSeconds: sm.timeSeconds,
+              weightKg: sm.weightKg,
+              completed: true,
+            ),
+          );
+        }
+      } else if (exLog.supersetMovements.isNotEmpty) {
+        for (final sm in exLog.supersetMovements) {
+          newSubMovements.add(
+            SubMovementSetLog(
+              movementId: sm.id,
+              name: sm.name,
+              targetMuscle: sm.targetMuscle,
+              isTimeBased: sm.isTimeBased,
+              reps: sm.defaultReps > 0 ? sm.defaultReps : 10,
+              timeSeconds:
+                  sm.defaultTimeSeconds > 0 ? sm.defaultTimeSeconds : 60,
+              weightKg: sm.defaultWeightKg,
+              completed: true,
+            ),
+          );
+        }
+      }
+
       currentSets.add(
         ExerciseSetLog(
           setNumber: currentSets.length + 1,
@@ -363,6 +422,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           timeSeconds: lastTime,
           weightKg: lastWeight,
           completed: true,
+          subMovements: newSubMovements,
           supersetReps: lastSuperReps,
           supersetTimeSeconds: lastSuperTime,
           supersetWeightKg: lastSuperWeight,
@@ -401,16 +461,31 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           exPR = true;
         }
 
-        if (ex.isSuperset && (ex.supersetName?.isNotEmpty ?? false)) {
-          if (_isSetPR(
-              ex.supersetName!,
-              s.supersetWeightKg,
-              s.supersetReps,
-              s.supersetTimeSeconds,
-              ex.supersetIsTimeBased)) {
-            s.supersetIsPersonalRecord = true;
-            if (!newPRs.contains(ex.supersetName!)) {
-              newPRs.add(ex.supersetName!);
+        if (ex.isSuperset) {
+          for (final sm in s.subMovements) {
+            final smName = sm.name ?? '';
+            if (smName.isNotEmpty &&
+                _isSetPR(smName, sm.weightKg, sm.reps, sm.timeSeconds,
+                    sm.isTimeBased)) {
+              sm.isPersonalRecord = true;
+              if (!newPRs.contains(smName)) {
+                newPRs.add(smName);
+              }
+            }
+          }
+          if (s.subMovements.isNotEmpty) {
+            s.supersetIsPersonalRecord = s.subMovements.first.isPersonalRecord;
+          } else if (ex.supersetName?.isNotEmpty ?? false) {
+            if (_isSetPR(
+                ex.supersetName!,
+                s.supersetWeightKg,
+                s.supersetReps,
+                s.supersetTimeSeconds,
+                ex.supersetIsTimeBased)) {
+              s.supersetIsPersonalRecord = true;
+              if (!newPRs.contains(ex.supersetName!)) {
+                newPRs.add(ex.supersetName!);
+              }
             }
           }
         }
@@ -1046,35 +1121,46 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     );
   }
 
+  void _ensureSubMovements(ExerciseCompletionLog exLog, ExerciseSetLog set) {
+    if (exLog.supersetMovements.isNotEmpty &&
+        set.subMovements.length < exLog.supersetMovements.length) {
+      for (int i = set.subMovements.length;
+          i < exLog.supersetMovements.length;
+          i++) {
+        final smDef = exLog.supersetMovements[i];
+        set.subMovements.add(
+          SubMovementSetLog(
+            movementId: smDef.id,
+            name: smDef.name,
+            targetMuscle: smDef.targetMuscle,
+            isTimeBased: smDef.isTimeBased,
+            reps: smDef.defaultReps > 0 ? smDef.defaultReps : 10,
+            timeSeconds:
+                smDef.defaultTimeSeconds > 0 ? smDef.defaultTimeSeconds : 60,
+            weightKg: smDef.defaultWeightKg,
+            completed: true,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildSupersetRow(
       int exerciseIndex, int setIndex, ExerciseSetLog set) {
     final exerciseLog = _exerciseLogs[exerciseIndex];
+    _ensureSubMovements(exerciseLog, set);
+
     final isTime1 = exerciseLog.isTimeBased;
-    final isTime2 = exerciseLog.supersetIsTimeBased;
 
     final wCtrl1 = _getWeightCtrl(exerciseIndex, setIndex, set.weightKg);
     final rCtrl1 = _getRepsCtrl(exerciseIndex, setIndex, set.reps);
     final tCtrl1 = _getTimeCtrl(exerciseIndex, setIndex, set.timeSeconds);
-
-    final wCtrl2 =
-        _getSuperWeightCtrl(exerciseIndex, setIndex, set.supersetWeightKg);
-    final rCtrl2 =
-        _getSuperRepsCtrl(exerciseIndex, setIndex, set.supersetReps);
-    final tCtrl2 =
-        _getSuperTimeCtrl(exerciseIndex, setIndex, set.supersetTimeSeconds);
 
     final lastText1 = _formatLastSetText(
       exerciseLog.exerciseName,
       setIndex,
       isTime1,
     );
-    final lastText2 = exerciseLog.supersetName != null
-        ? _formatLastSuperSetText(
-            exerciseLog.supersetName!,
-            setIndex,
-            isTime2,
-          )
-        : null;
 
     final isPR1 = set.completed &&
         _isSetPR(
@@ -1084,15 +1170,170 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           set.timeSeconds,
           isTime1,
         );
-    final isPR2 = set.completed &&
-        exerciseLog.supersetName != null &&
-        _isSetPR(
-          exerciseLog.supersetName!,
-          set.supersetWeightKg,
-          set.supersetReps,
-          set.supersetTimeSeconds,
-          isTime2,
+
+    final subMovementWidgets = <Widget>[];
+    final ghostAndPRChips = <Widget>[];
+
+    if (lastText1 != null) {
+      ghostAndPRChips.add(
+        Text(
+          '1: $lastText1',
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppTheme.textMuted,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+    if (isPR1) {
+      ghostAndPRChips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            '1: PR!',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Process all chained sub-movements
+    for (int m = 0; m < set.subMovements.length; m++) {
+      final subLog = set.subMovements[m];
+      final subDef = m < exerciseLog.supersetMovements.length
+          ? exerciseLog.supersetMovements[m]
+          : null;
+      final subName = (subLog.name?.isNotEmpty == true)
+          ? subLog.name!
+          : (subDef?.name.isNotEmpty == true
+              ? subDef!.name
+              : (m == 0 && exerciseLog.supersetName?.isNotEmpty == true
+                  ? exerciseLog.supersetName!
+                  : 'Movement ${m + 2}'));
+      final subIsTime = subDef?.isTimeBased ?? subLog.isTimeBased;
+
+      final wCtrlSub = _getSubMovementWeightCtrl(
+          exerciseIndex, setIndex, m, subLog.weightKg);
+      final rCtrlSub =
+          _getSubMovementRepsCtrl(exerciseIndex, setIndex, m, subLog.reps);
+      final tCtrlSub = _getSubMovementTimeCtrl(
+          exerciseIndex, setIndex, m, subLog.timeSeconds);
+
+      final lastTextSub =
+          _formatLastSubMovementSetText(subName, setIndex, subIsTime);
+      final isPRSub = set.completed &&
+          _isSetPR(
+            subName,
+            subLog.weightKg,
+            subLog.reps,
+            subLog.timeSeconds,
+            subIsTime,
+          );
+
+      if (lastTextSub != null) {
+        ghostAndPRChips.add(
+          Text(
+            '${m + 2}: $lastTextSub',
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppTheme.textMuted,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         );
+      }
+      if (isPRSub) {
+        ghostAndPRChips.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${m + 2}: PR!',
+              style: const TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        );
+      }
+
+      subMovementWidgets.add(const SizedBox(height: 8));
+      subMovementWidgets.add(
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.accentAmber.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt, size: 11, color: AppTheme.accentAmber),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${m + 2}. $subName',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentAmber,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Spacer(),
+            _buildMovementMiniInputs(
+              isTime: subIsTime,
+              weight: subLog.weightKg,
+              weightCtrl: wCtrlSub,
+              reps: subLog.reps,
+              repsCtrl: rCtrlSub,
+              timeSeconds: subLog.timeSeconds,
+              timeCtrl: tCtrlSub,
+              onWeightChanged: (w) => setState(() {
+                subLog.weightKg = w;
+                if (m == 0) set.supersetWeightKg = w;
+              }),
+              onRepsChanged: (r) => setState(() {
+                subLog.reps = r;
+                if (m == 0) set.supersetReps = r;
+              }),
+              onTimeChanged: (t) => setState(() {
+                subLog.timeSeconds = t;
+                if (m == 0) set.supersetTimeSeconds = t;
+              }),
+              color: AppTheme.accentAmber,
+              movementTitle: subName,
+              exerciseIndex: exerciseIndex,
+              setIndex: setIndex,
+              set: set,
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1132,7 +1373,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // Two Paired Movements
+          // All Paired Movements (Movement 1 + SubMovements)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1178,122 +1419,13 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                // Movement 2 Row
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentAmber.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.bolt,
-                              size: 11, color: AppTheme.accentAmber),
-                          const SizedBox(width: 2),
-                          Text(
-                            '2. ${exerciseLog.supersetName?.isNotEmpty == true ? exerciseLog.supersetName : "Movement 2"}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.accentAmber,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    _buildMovementMiniInputs(
-                      isTime: isTime2,
-                      weight: set.supersetWeightKg,
-                      weightCtrl: wCtrl2,
-                      reps: set.supersetReps,
-                      repsCtrl: rCtrl2,
-                      timeSeconds: set.supersetTimeSeconds,
-                      timeCtrl: tCtrl2,
-                      onWeightChanged: (w) =>
-                          setState(() => set.supersetWeightKg = w),
-                      onRepsChanged: (r) =>
-                          setState(() => set.supersetReps = r),
-                      onTimeChanged: (t) =>
-                          setState(() => set.supersetTimeSeconds = t),
-                      color: AppTheme.accentAmber,
-                      movementTitle: exerciseLog.supersetName ?? 'Movement 2',
-                      exerciseIndex: exerciseIndex,
-                      setIndex: setIndex,
-                      set: set,
-                    ),
-                  ],
-                ),
-                if (lastText1 != null || isPR1 || lastText2 != null || isPR2) ...[
+                ...subMovementWidgets,
+                if (ghostAndPRChips.isNotEmpty) ...[
                   const SizedBox(height: 5),
                   Wrap(
                     spacing: 8,
                     runSpacing: 3,
-                    children: [
-                      if (lastText1 != null)
-                        Text(
-                          '1: $lastText1',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textMuted,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      if (isPR1)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '1: PR!',
-                            style: TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      if (lastText2 != null)
-                        Text(
-                          '2: $lastText2',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textMuted,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      if (isPR2)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '2: PR!',
-                            style: TextStyle(
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
+                    children: ghostAndPRChips,
                   ),
                 ],
               ],
@@ -1387,7 +1519,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                           Flexible(
                             child: Text(
                               isSuperset
-                                  ? '${exerciseLog.exerciseName} + ${exerciseLog.supersetName?.isNotEmpty == true ? exerciseLog.supersetName : "Movement 2"}'
+                                  ? exerciseLog.allExerciseNames.join(' + ')
                                   : exerciseLog.exerciseName,
                               style: TextStyle(
                                 fontSize: 16,
@@ -1411,9 +1543,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                                     color: AppTheme.accentAmber
                                         .withValues(alpha: 0.4)),
                               ),
-                              child: const Text(
-                                'SUPERSET',
-                                style: TextStyle(
+                              child: Text(
+                                exerciseLog.supersetBadgeTitle.toUpperCase(),
+                                style: const TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.accentAmber,
@@ -1451,7 +1583,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1472,24 +1606,26 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                             ),
                           ),
                           if (isSuperset) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.accentAmber
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '2: ${exerciseLog.supersetTargetMuscle ?? "General"}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.accentAmber,
+                            for (int m = 0;
+                                m < exerciseLog.supersetMovements.length;
+                                m++)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentAmber
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${m + 2}: ${exerciseLog.supersetMovements[m].targetMuscle}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.accentAmber,
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ],
                       ),
@@ -1543,9 +1679,12 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                 ),
                 const SizedBox(width: 6),
                 if (isSuperset) ...[
-                  const Expanded(
-                    child: Text('PAIRED MOVEMENTS (1 & 2)',
-                        style: TextStyle(
+                  Expanded(
+                    child: Text(
+                        exerciseLog.totalMovements == 2
+                            ? 'PAIRED MOVEMENTS (1 & 2)'
+                            : 'PAIRED MOVEMENTS (${exerciseLog.totalMovements})',
+                        style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: AppTheme.textMuted)),

@@ -183,7 +183,7 @@ class _HistoryCardState extends State<HistoryCard> {
                               Flexible(
                                 child: Text(
                                   exLog.isSuperset
-                                      ? '${exLog.exerciseName} + ${exLog.supersetName?.isNotEmpty == true ? exLog.supersetName : "Movement 2"}'
+                                      ? exLog.allExerciseNames.join(' + ')
                                       : exLog.exerciseName,
                                   style: TextStyle(
                                     fontSize: 14,
@@ -195,10 +195,37 @@ class _HistoryCardState extends State<HistoryCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (exLog.isSuperset) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentAmber
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                        color: AppTheme.accentAmber
+                                            .withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    exLog.supersetBadgeTitle.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.accentAmber,
+                                    ),
+                                  ),
+                                ),
+                              ],
                               const SizedBox(width: 8),
                               Text(
                                 exLog.isSuperset
-                                    ? '${exLog.targetMuscle} / ${exLog.supersetTargetMuscle ?? "General"}'
+                                    ? [
+                                        exLog.targetMuscle,
+                                        ...exLog.supersetMovements
+                                            .map((m) => m.targetMuscle)
+                                      ].join(' / ')
                                     : exLog.targetMuscle,
                                 style: const TextStyle(
                                   fontSize: 11,
@@ -234,7 +261,10 @@ class _HistoryCardState extends State<HistoryCard> {
                             spacing: 8,
                             runSpacing: 6,
                             children: exLog.sets.map((s) {
-                              final isPr = s.isPersonalRecord || s.supersetIsPersonalRecord;
+                              final isPr = s.isPersonalRecord ||
+                                  s.subMovements
+                                      .any((sm) => sm.isPersonalRecord) ||
+                                  s.supersetIsPersonalRecord;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
