@@ -112,6 +112,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
         exerciseName: exercise.name,
         targetMuscle: exercise.targetMuscle,
         isTimeBased: exercise.isTimeBased,
+        isAmrap: exercise.isAmrap,
         isSuperset: exercise.isSuperset,
         supersetName: exercise.supersetName,
         supersetTargetMuscle: exercise.supersetTargetMuscle,
@@ -127,12 +128,14 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                 : 60,
             weightKg: exercise.defaultWeightKg,
             completed: true,
+            isAmrap: exercise.isAmrap,
             subMovements: exercise.supersetMovements.map((sm) {
               return SubMovementSetLog(
                 movementId: sm.id,
                 name: sm.name,
                 targetMuscle: sm.targetMuscle,
                 isTimeBased: sm.isTimeBased,
+                isAmrap: sm.isAmrap,
                 reps: sm.defaultReps > 0 ? sm.defaultReps : 10,
                 timeSeconds:
                     sm.defaultTimeSeconds > 0 ? sm.defaultTimeSeconds : 60,
@@ -390,6 +393,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
               name: sm.name,
               targetMuscle: sm.targetMuscle,
               isTimeBased: sm.isTimeBased,
+              isAmrap: sm.isAmrap,
               reps: sm.reps,
               timeSeconds: sm.timeSeconds,
               weightKg: sm.weightKg,
@@ -405,6 +409,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
               name: sm.name,
               targetMuscle: sm.targetMuscle,
               isTimeBased: sm.isTimeBased,
+              isAmrap: sm.isAmrap,
               reps: sm.defaultReps > 0 ? sm.defaultReps : 10,
               timeSeconds:
                   sm.defaultTimeSeconds > 0 ? sm.defaultTimeSeconds : 60,
@@ -422,6 +427,8 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           timeSeconds: lastTime,
           weightKg: lastWeight,
           completed: true,
+          isAmrap:
+              currentSets.isNotEmpty ? currentSets.last.isAmrap : exLog.isAmrap,
           subMovements: newSubMovements,
           supersetReps: lastSuperReps,
           supersetTimeSeconds: lastSuperTime,
@@ -1186,6 +1193,25 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
         ),
       );
     }
+    if (set.isAmrap) {
+      ghostAndPRChips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppTheme.accentAmber.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            '1: AMRAP',
+            style: TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.accentAmber,
+            ),
+          ),
+        ),
+      );
+    }
     if (isPR1) {
       ghostAndPRChips.add(
         Container(
@@ -1249,6 +1275,25 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
               fontSize: 10,
               color: AppTheme.textMuted,
               fontStyle: FontStyle.italic,
+            ),
+          ),
+        );
+      }
+      if (subLog.isAmrap) {
+        ghostAndPRChips.add(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppTheme.accentAmber.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${m + 2}: AMRAP',
+              style: const TextStyle(
+                fontSize: 8.5,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.accentAmber,
+              ),
             ),
           ),
         );
@@ -1574,6 +1619,36 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.secondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (exerciseLog.isAmrap) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentAmber
+                                    .withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                    color: AppTheme.accentAmber
+                                        .withValues(alpha: 0.4)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bolt,
+                                      size: 11, color: AppTheme.accentAmber),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'AMRAP',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.accentAmber,
                                     ),
                                   ),
                                 ],
@@ -2103,12 +2178,34 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           ),
         ],
       ),
-      if (lastSetText != null || isPR) ...[
+      if (lastSetText != null || isPR || set.isAmrap) ...[
         const SizedBox(height: 4),
         Padding(
           padding: const EdgeInsets.only(left: 42),
           child: Row(
             children: [
+              if (set.isAmrap) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentAmber.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: AppTheme.accentAmber.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Text(
+                    '⚡ AMRAP',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.accentAmber,
+                    ),
+                  ),
+                ),
+                if (lastSetText != null || isPR) const SizedBox(width: 6),
+              ],
               if (lastSetText != null) ...[
                 const Icon(Icons.history, size: 11, color: AppTheme.textMuted),
                 const SizedBox(width: 3),

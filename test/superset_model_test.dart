@@ -297,6 +297,82 @@ void main() {
 
       expect(workoutLog.prExerciseNames, contains('Calf Raises'));
     });
+
+    test('AMRAP (As Many Reps As Possible) model serialization & formatting', () {
+      final amrapEx = Exercise(
+        id: 'amrap-pushups',
+        name: 'Push-Ups',
+        targetMuscle: 'Chest',
+        defaultSets: 3,
+        defaultReps: 0,
+        isAmrap: true,
+        defaultWeightKg: 0.0,
+      );
+
+      expect(amrapEx.isAmrap, true);
+      final exJson = amrapEx.toJson();
+      expect(exJson['isAmrap'], true);
+
+      final decodedEx = Exercise.fromJson(exJson);
+      expect(decodedEx.isAmrap, true);
+
+      // SubMovement AMRAP
+      final subM = SupersetMovement(
+        id: 'sub-amrap',
+        name: 'Chin-Ups',
+        targetMuscle: 'Back',
+        isAmrap: true,
+      );
+      expect(subM.isAmrap, true);
+      final subJson = subM.toJson();
+      expect(subJson['isAmrap'], true);
+      final decodedSub = SupersetMovement.fromJson(subJson);
+      expect(decodedSub.isAmrap, true);
+
+      // ExerciseCompletionLog formatSetText with AMRAP
+      final setLog = ExerciseSetLog(
+        setNumber: 1,
+        reps: 18,
+        weightKg: 0.0,
+        isAmrap: true,
+        subMovements: [
+          SubMovementSetLog(
+            movementId: 'sub-amrap',
+            name: 'Chin-Ups',
+            targetMuscle: 'Back',
+            reps: 12,
+            weightKg: 0.0,
+            isAmrap: true,
+          ),
+        ],
+      );
+
+      final compLog = ExerciseCompletionLog(
+        exerciseId: 'amrap-pushups',
+        exerciseName: 'Push-Ups',
+        targetMuscle: 'Chest',
+        isAmrap: true,
+        isSuperset: true,
+        supersetMovements: [subM],
+        sets: [setLog],
+      );
+
+      final text = compLog.formatSetText(setLog);
+      expect(text, contains('18 reps (AMRAP)'));
+      expect(text, contains('12 reps (AMRAP)'));
+
+      // Backward compatibility: missing isAmrap key defaults to false
+      final legacyJson = {
+        'id': 'legacy-ex',
+        'name': 'Squat',
+        'targetMuscle': 'Quads',
+        'defaultSets': 3,
+        'defaultReps': 10,
+      };
+      final legacyEx = Exercise.fromJson(legacyJson);
+      expect(legacyEx.isAmrap, false);
+    });
   });
 }
+
 

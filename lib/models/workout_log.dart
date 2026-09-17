@@ -5,6 +5,7 @@ class SubMovementSetLog {
   String? name;
   String? targetMuscle;
   bool isTimeBased;
+  bool isAmrap;
   int reps;
   int timeSeconds;
   double weightKg;
@@ -16,6 +17,7 @@ class SubMovementSetLog {
     this.name,
     this.targetMuscle,
     this.isTimeBased = false,
+    this.isAmrap = false,
     this.reps = 10,
     this.timeSeconds = 60,
     this.weightKg = 0.0,
@@ -28,6 +30,7 @@ class SubMovementSetLog {
         if (name != null) 'name': name,
         if (targetMuscle != null) 'targetMuscle': targetMuscle,
         'isTimeBased': isTimeBased,
+        'isAmrap': isAmrap,
         'reps': reps,
         'timeSeconds': timeSeconds,
         'weightKg': weightKg,
@@ -41,6 +44,7 @@ class SubMovementSetLog {
         name: json['name'] as String?,
         targetMuscle: json['targetMuscle'] as String?,
         isTimeBased: json['isTimeBased'] as bool? ?? false,
+        isAmrap: json['isAmrap'] as bool? ?? false,
         reps: (json['reps'] as num?)?.toInt() ?? 10,
         timeSeconds: (json['timeSeconds'] as num?)?.toInt() ?? 60,
         weightKg: (json['weightKg'] as num?)?.toDouble() ?? 0.0,
@@ -53,6 +57,7 @@ class SubMovementSetLog {
         name: name,
         targetMuscle: targetMuscle,
         isTimeBased: isTimeBased,
+        isAmrap: isAmrap,
         reps: reps,
         timeSeconds: timeSeconds,
         weightKg: weightKg,
@@ -68,6 +73,7 @@ class ExerciseSetLog {
   double weightKg;
   bool completed;
   bool isPersonalRecord;
+  bool isAmrap;
 
   // Multi-movement paired metrics (Movement 2, Movement 3, etc.)
   List<SubMovementSetLog> subMovements;
@@ -79,6 +85,7 @@ class ExerciseSetLog {
     this.weightKg = 0.0,
     this.completed = true,
     this.isPersonalRecord = false,
+    this.isAmrap = false,
     List<SubMovementSetLog>? subMovements,
     // Legacy single paired fields for backward compatibility
     int? supersetReps,
@@ -148,6 +155,7 @@ class ExerciseSetLog {
         'weightKg': weightKg,
         'completed': completed,
         'isPersonalRecord': isPersonalRecord,
+        'isAmrap': isAmrap,
         'subMovements': subMovements.map((s) => s.toJson()).toList(),
         // Legacy keys for backward compatibility
         'supersetReps': supersetReps,
@@ -182,6 +190,7 @@ class ExerciseSetLog {
       weightKg: (json['weightKg'] as num?)?.toDouble() ?? 0.0,
       completed: json['completed'] as bool? ?? true,
       isPersonalRecord: json['isPersonalRecord'] as bool? ?? false,
+      isAmrap: json['isAmrap'] as bool? ?? false,
       subMovements: subMovements,
     );
   }
@@ -193,6 +202,7 @@ class ExerciseSetLog {
         weightKg: weightKg,
         completed: completed,
         isPersonalRecord: isPersonalRecord,
+        isAmrap: isAmrap,
         subMovements: subMovements.map((s) => s.copy()).toList(),
       );
 }
@@ -202,6 +212,7 @@ class ExerciseCompletionLog {
   final String exerciseName;
   final String targetMuscle;
   final bool isTimeBased;
+  final bool isAmrap;
   final List<ExerciseSetLog> sets;
   final String notes;
 
@@ -218,6 +229,7 @@ class ExerciseCompletionLog {
     required this.exerciseName,
     this.targetMuscle = 'General',
     this.isTimeBased = false,
+    this.isAmrap = false,
     required this.sets,
     this.notes = '',
     this.isSuperset = false,
@@ -326,7 +338,8 @@ class ExerciseCompletionLog {
       parts.add('$timeStr$weightStr');
     } else {
       final weightStr = s.weightKg > 0 ? ' @ ${s.weightKg}kg' : '';
-      parts.add('${s.reps} reps$weightStr');
+      final amrapTag = s.isAmrap ? ' (AMRAP)' : '';
+      parts.add('${s.reps} reps$amrapTag$weightStr');
     }
 
     if (isSuperset) {
@@ -346,7 +359,8 @@ class ExerciseCompletionLog {
         } else {
           final weightStr =
               subSet.weightKg > 0 ? ' @ ${subSet.weightKg}kg' : '';
-          parts.add('${subSet.reps} reps$weightStr');
+          final amrapTag = subSet.isAmrap ? ' (AMRAP)' : '';
+          parts.add('${subSet.reps} reps$amrapTag$weightStr');
         }
       }
     }
@@ -359,6 +373,7 @@ class ExerciseCompletionLog {
         'exerciseName': exerciseName,
         'targetMuscle': targetMuscle,
         'isTimeBased': isTimeBased,
+        'isAmrap': isAmrap,
         'sets': sets.map((s) => s.toJson()).toList(),
         'notes': notes,
         'isSuperset': isSuperset,
@@ -396,6 +411,7 @@ class ExerciseCompletionLog {
       exerciseName: json['exerciseName'] as String? ?? 'Exercise',
       targetMuscle: json['targetMuscle'] as String? ?? 'General',
       isTimeBased: json['isTimeBased'] as bool? ?? false,
+      isAmrap: json['isAmrap'] as bool? ?? false,
       sets: (json['sets'] as List<dynamic>?)
               ?.map((s) => ExerciseSetLog.fromJson(s as Map<String, dynamic>))
               .toList() ??

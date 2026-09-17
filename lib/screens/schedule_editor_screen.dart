@@ -21,6 +21,7 @@ class _SubMovementDraft {
   final TextEditingController timeCtrl;
   final TextEditingController weightCtrl;
   bool isTimeBased;
+  bool isAmrap;
 
   _SubMovementDraft({
     String name = '',
@@ -29,6 +30,7 @@ class _SubMovementDraft {
     int timeSeconds = 60,
     double weightKg = 0.0,
     this.isTimeBased = false,
+    this.isAmrap = false,
   })  : nameCtrl = TextEditingController(text: name),
         muscleCtrl = TextEditingController(text: muscle),
         repsCtrl = TextEditingController(text: reps.toString()),
@@ -252,15 +254,69 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             ),
           ],
         ),
+        if (!draft.isTimeBased) ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => setDialogState(() => draft.isAmrap = !draft.isAmrap),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: draft.isAmrap
+                    ? AppTheme.accentAmber.withValues(alpha: 0.15)
+                    : AppTheme.surfaceLighter,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: draft.isAmrap
+                      ? AppTheme.accentAmber
+                      : AppTheme.surfaceHighlight,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    draft.isAmrap
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank,
+                    size: 15,
+                    color: draft.isAmrap
+                        ? AppTheme.accentAmber
+                        : AppTheme.textMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '⚡ AMRAP (As Many Reps As Possible)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: draft.isAmrap
+                          ? AppTheme.accentAmber
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
               child: TextField(
                 controller: draft.isTimeBased ? draft.timeCtrl : draft.repsCtrl,
+                enabled: draft.isTimeBased || !draft.isAmrap,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: draft.isTimeBased ? 'Hold (s)' : 'Reps',
+                  labelText: draft.isTimeBased
+                      ? 'Hold (s)'
+                      : (draft.isAmrap ? 'Reps (AMRAP Enabled)' : 'Reps'),
+                  hintText: draft.isAmrap ? 'AMRAP' : '10',
+                  prefixIcon: draft.isAmrap
+                      ? const Icon(Icons.bolt,
+                          size: 16, color: AppTheme.accentAmber)
+                      : null,
                 ),
               ),
             ),
@@ -297,6 +353,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     final weightCtrl = TextEditingController(
         text: (existing?.defaultWeightKg ?? 0.0).toString());
     bool isTimeBased = existing?.isTimeBased ?? false;
+    bool isAmrap = existing?.isAmrap ?? false;
 
     // Sub-movements (Movement 2, 3, etc.) drafts
     final drafts = <_SubMovementDraft>[];
@@ -310,6 +367,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             timeSeconds: sm.defaultTimeSeconds,
             weightKg: sm.defaultWeightKg,
             isTimeBased: sm.isTimeBased,
+            isAmrap: sm.isAmrap,
           ));
         }
       } else if (existing.supersetName?.isNotEmpty ?? false) {
@@ -320,6 +378,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
           timeSeconds: existing.supersetTimeSeconds ?? 60,
           weightKg: existing.supersetWeightKg ?? 0.0,
           isTimeBased: existing.supersetIsTimeBased,
+          isAmrap: false,
         ));
       }
     }
@@ -580,6 +639,54 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           ),
                         ],
                       ),
+                      if (!isTimeBased) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () =>
+                              setDialogState(() => isAmrap = !isAmrap),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isAmrap
+                                  ? AppTheme.accentAmber.withValues(alpha: 0.15)
+                                  : AppTheme.surfaceLighter,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isAmrap
+                                    ? AppTheme.accentAmber
+                                    : AppTheme.surfaceHighlight,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isAmrap
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank,
+                                  size: 15,
+                                  color: isAmrap
+                                      ? AppTheme.accentAmber
+                                      : AppTheme.textMuted,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '⚡ AMRAP (As Many Reps As Possible)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAmrap
+                                        ? AppTheme.accentAmber
+                                        : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
 
                       Row(
@@ -587,9 +694,19 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           Expanded(
                             child: TextField(
                               controller: isTimeBased ? timeCtrl : repsCtrl,
+                              enabled: isTimeBased || !isAmrap,
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
-                                labelText: isTimeBased ? 'Hold (s)' : 'Reps',
+                                labelText: isTimeBased
+                                    ? 'Hold (s)'
+                                    : (isAmrap
+                                        ? 'Reps (AMRAP Enabled)'
+                                        : 'Reps'),
+                                hintText: isAmrap ? 'AMRAP' : '10',
+                                prefixIcon: isAmrap
+                                    ? const Icon(Icons.bolt,
+                                        size: 16, color: AppTheme.accentAmber)
+                                    : null,
                               ),
                             ),
                           ),
@@ -597,8 +714,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           Expanded(
                             child: TextField(
                               controller: weightCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
                               decoration: const InputDecoration(
                                 labelText: 'Weight (kg)',
                               ),
@@ -710,6 +828,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         name: sName.isNotEmpty ? sName : 'Movement',
                         targetMuscle: sMuscle,
                         isTimeBased: d.isTimeBased,
+                        isAmrap: d.isAmrap,
                         defaultReps: sReps,
                         defaultTimeSeconds: sTime,
                         defaultWeightKg: sWeight,
@@ -725,6 +844,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         name: name,
                         targetMuscle: muscle,
                         isTimeBased: isTimeBased,
+                        isAmrap: isAmrap,
                         defaultSets: sets,
                         defaultReps: reps,
                         defaultTimeSeconds: time,
@@ -1078,6 +1198,28 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                         ),
                                       ),
                                     ),
+                                  ] else if (ex.isAmrap) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentAmber
+                                            .withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                            color: AppTheme.accentAmber
+                                                .withValues(alpha: 0.4)),
+                                      ),
+                                      child: const Text(
+                                        '⚡ AMRAP',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.accentAmber,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ],
                               ),
@@ -1085,15 +1227,15 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                               Text(
                                 ex.isSuperset
                                     ? '${ex.defaultSets} rounds • ${[
-                                        '1: ${ex.targetMuscle} (${ex.isTimeBased ? "${ex.defaultTimeSeconds}s" : "${ex.defaultReps}r"}${ex.defaultWeightKg > 0 ? " @ ${ex.defaultWeightKg}kg" : ""})',
+                                        '1: ${ex.targetMuscle} (${ex.isTimeBased ? "${ex.defaultTimeSeconds}s" : (ex.isAmrap ? "AMRAP" : "${ex.defaultReps}r")}${ex.defaultWeightKg > 0 ? " @ ${ex.defaultWeightKg}kg" : ""})',
                                         for (int m = 0;
                                             m < ex.supersetMovements.length;
                                             m++)
-                                          '${m + 2}: ${ex.supersetMovements[m].targetMuscle} (${ex.supersetMovements[m].isTimeBased ? "${ex.supersetMovements[m].defaultTimeSeconds}s" : "${ex.supersetMovements[m].defaultReps}r"}${ex.supersetMovements[m].defaultWeightKg > 0 ? " @ ${ex.supersetMovements[m].defaultWeightKg}kg" : ""})',
+                                          '${m + 2}: ${ex.supersetMovements[m].targetMuscle} (${ex.supersetMovements[m].isTimeBased ? "${ex.supersetMovements[m].defaultTimeSeconds}s" : (ex.supersetMovements[m].isAmrap ? "AMRAP" : "${ex.supersetMovements[m].defaultReps}r")}${ex.supersetMovements[m].defaultWeightKg > 0 ? " @ ${ex.supersetMovements[m].defaultWeightKg}kg" : ""})',
                                       ].join(' + ')}'
                                     : (ex.isTimeBased
                                         ? '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultTimeSeconds}s hold ${ex.defaultWeightKg > 0 ? '(+${ex.defaultWeightKg}kg)' : ''}'
-                                        : '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.defaultReps} reps • ${ex.defaultWeightKg}kg'),
+                                        : '${ex.targetMuscle} • ${ex.defaultSets} sets × ${ex.isAmrap ? "AMRAP" : "${ex.defaultReps} reps"} • ${ex.defaultWeightKg}kg'),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.textMuted,

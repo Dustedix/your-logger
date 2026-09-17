@@ -232,6 +232,34 @@ class _HistoryCardState extends State<HistoryCard> {
                                   color: AppTheme.secondary,
                                 ),
                               ),
+                              if (exLog.isAmrap ||
+                                  exLog.sets.any((s) =>
+                                      s.isAmrap ||
+                                      s.subMovements
+                                          .any((sm) => sm.isAmrap))) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentAmber
+                                        .withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: AppTheme.accentAmber
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'AMRAP',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.accentAmber,
+                                    ),
+                                  ),
+                                ),
+                              ],
                               if (exLog.hasPersonalRecord) ...[
                                 const SizedBox(width: 6),
                                 Container(

@@ -3,6 +3,7 @@ class SupersetMovement {
   final String name;
   final String targetMuscle;
   final bool isTimeBased;
+  final bool isAmrap;
   final int defaultReps;
   final int defaultTimeSeconds;
   final double defaultWeightKg;
@@ -12,6 +13,7 @@ class SupersetMovement {
     required this.name,
     this.targetMuscle = 'General',
     this.isTimeBased = false,
+    this.isAmrap = false,
     this.defaultReps = 10,
     this.defaultTimeSeconds = 60,
     this.defaultWeightKg = 0.0,
@@ -22,6 +24,7 @@ class SupersetMovement {
         'name': name,
         'targetMuscle': targetMuscle,
         'isTimeBased': isTimeBased,
+        'isAmrap': isAmrap,
         'defaultReps': defaultReps,
         'defaultTimeSeconds': defaultTimeSeconds,
         'defaultWeightKg': defaultWeightKg,
@@ -33,6 +36,7 @@ class SupersetMovement {
         name: json['name'] as String? ?? 'Movement',
         targetMuscle: json['targetMuscle'] as String? ?? 'General',
         isTimeBased: json['isTimeBased'] as bool? ?? false,
+        isAmrap: json['isAmrap'] as bool? ?? false,
         defaultReps: (json['defaultReps'] as num?)?.toInt() ?? 10,
         defaultTimeSeconds:
             (json['defaultTimeSeconds'] as num?)?.toInt() ?? 60,
@@ -44,6 +48,7 @@ class SupersetMovement {
     String? name,
     String? targetMuscle,
     bool? isTimeBased,
+    bool? isAmrap,
     int? defaultReps,
     int? defaultTimeSeconds,
     double? defaultWeightKg,
@@ -53,6 +58,7 @@ class SupersetMovement {
         name: name ?? this.name,
         targetMuscle: targetMuscle ?? this.targetMuscle,
         isTimeBased: isTimeBased ?? this.isTimeBased,
+        isAmrap: isAmrap ?? this.isAmrap,
         defaultReps: defaultReps ?? this.defaultReps,
         defaultTimeSeconds: defaultTimeSeconds ?? this.defaultTimeSeconds,
         defaultWeightKg: defaultWeightKg ?? this.defaultWeightKg,
@@ -64,6 +70,7 @@ class Exercise {
   final String name;
   final String targetMuscle;
   final bool isTimeBased; // True for Plank, Wall Sit, Static Holds
+  final bool isAmrap; // True for As Many Reps As Possible
   final int defaultSets;
   final int defaultReps;
   final int defaultTimeSeconds; // In seconds (e.g. 60s)
@@ -86,6 +93,7 @@ class Exercise {
     required this.name,
     this.targetMuscle = 'General',
     this.isTimeBased = false,
+    this.isAmrap = false,
     this.defaultSets = 3,
     this.defaultReps = 10,
     this.defaultTimeSeconds = 60,
@@ -165,6 +173,7 @@ class Exercise {
         'name': name,
         'targetMuscle': targetMuscle,
         'isTimeBased': isTimeBased,
+        'isAmrap': isAmrap,
         'defaultSets': defaultSets,
         'defaultReps': defaultReps,
         'defaultTimeSeconds': defaultTimeSeconds,
@@ -213,6 +222,7 @@ class Exercise {
       name: json['name'] as String? ?? 'Exercise',
       targetMuscle: json['targetMuscle'] as String? ?? 'General',
       isTimeBased: json['isTimeBased'] as bool? ?? false,
+      isAmrap: json['isAmrap'] as bool? ?? false,
       defaultSets: (json['defaultSets'] as num?)?.toInt() ?? 3,
       defaultReps: (json['defaultReps'] as num?)?.toInt() ?? 10,
       defaultTimeSeconds:
@@ -237,6 +247,7 @@ class Exercise {
     String? name,
     String? targetMuscle,
     bool? isTimeBased,
+    bool? isAmrap,
     int? defaultSets,
     int? defaultReps,
     int? defaultTimeSeconds,
@@ -256,6 +267,7 @@ class Exercise {
       name: name ?? this.name,
       targetMuscle: targetMuscle ?? this.targetMuscle,
       isTimeBased: isTimeBased ?? this.isTimeBased,
+      isAmrap: isAmrap ?? this.isAmrap,
       defaultSets: defaultSets ?? this.defaultSets,
       defaultReps: defaultReps ?? this.defaultReps,
       defaultTimeSeconds: defaultTimeSeconds ?? this.defaultTimeSeconds,
