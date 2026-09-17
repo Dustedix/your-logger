@@ -65,6 +65,41 @@ class _HistoryCardState extends State<HistoryCard> {
                         ),
                       ),
                       const Spacer(),
+                      if (log.hasPersonalRecord) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.accentAmber.withValues(alpha: 0.25),
+                                AppTheme.accentAmber.withValues(alpha: 0.1),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppTheme.accentAmber.withValues(alpha: 0.6)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.emoji_events,
+                                  size: 13, color: AppTheme.accentAmber),
+                              SizedBox(width: 4),
+                              Text(
+                                'PR',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.accentAmber,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Text(
                         '${log.durationMinutes} min',
                         style: const TextStyle(
@@ -170,6 +205,28 @@ class _HistoryCardState extends State<HistoryCard> {
                                   color: AppTheme.secondary,
                                 ),
                               ),
+                              if (exLog.hasPersonalRecord) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentAmber.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: AppTheme.accentAmber.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'PR',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.accentAmber,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -177,30 +234,50 @@ class _HistoryCardState extends State<HistoryCard> {
                             spacing: 8,
                             runSpacing: 6,
                             children: exLog.sets.map((s) {
+                              final isPr = s.isPersonalRecord || s.supersetIsPersonalRecord;
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: s.completed
-                                      ? AppTheme.surfaceLighter
-                                      : AppTheme.surfaceLighter
-                                          .withValues(alpha: 0.4),
+                                  color: isPr
+                                      ? AppTheme.accentAmber.withValues(alpha: 0.15)
+                                      : (s.completed
+                                          ? AppTheme.surfaceLighter
+                                          : AppTheme.surfaceLighter
+                                              .withValues(alpha: 0.4)),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: s.completed
-                                        ? AppTheme.primary.withValues(alpha: 0.3)
-                                        : AppTheme.surfaceHighlight,
+                                    color: isPr
+                                        ? AppTheme.accentAmber.withValues(alpha: 0.6)
+                                        : (s.completed
+                                            ? AppTheme.primary.withValues(alpha: 0.3)
+                                            : AppTheme.surfaceHighlight),
                                   ),
                                 ),
-                                child: Text(
-                                  'Set ${s.setNumber}: ${exLog.formatSetText(s)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: s.completed
-                                        ? AppTheme.textPrimary
-                                        : AppTheme.textMuted,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Set ${s.setNumber}: ${exLog.formatSetText(s)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isPr
+                                            ? AppTheme.accentAmber
+                                            : (s.completed
+                                                ? AppTheme.textPrimary
+                                                : AppTheme.textMuted),
+                                      ),
+                                    ),
+                                    if (isPr) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.emoji_events,
+                                        size: 11,
+                                        color: AppTheme.accentAmber,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               );
                             }).toList(),

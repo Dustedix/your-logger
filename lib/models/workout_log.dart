@@ -10,6 +10,10 @@ class ExerciseSetLog {
   int supersetTimeSeconds;
   double supersetWeightKg;
 
+  // Personal record flags
+  bool isPersonalRecord;
+  bool supersetIsPersonalRecord;
+
   ExerciseSetLog({
     required this.setNumber,
     this.reps = 10,
@@ -19,6 +23,8 @@ class ExerciseSetLog {
     this.supersetReps = 10,
     this.supersetTimeSeconds = 60,
     this.supersetWeightKg = 0.0,
+    this.isPersonalRecord = false,
+    this.supersetIsPersonalRecord = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -30,6 +36,8 @@ class ExerciseSetLog {
         'supersetReps': supersetReps,
         'supersetTimeSeconds': supersetTimeSeconds,
         'supersetWeightKg': supersetWeightKg,
+        'isPersonalRecord': isPersonalRecord,
+        'supersetIsPersonalRecord': supersetIsPersonalRecord,
       };
 
   factory ExerciseSetLog.fromJson(Map<String, dynamic> json) => ExerciseSetLog(
@@ -43,6 +51,9 @@ class ExerciseSetLog {
             (json['supersetTimeSeconds'] as num?)?.toInt() ?? 60,
         supersetWeightKg:
             (json['supersetWeightKg'] as num?)?.toDouble() ?? 0.0,
+        isPersonalRecord: json['isPersonalRecord'] as bool? ?? false,
+        supersetIsPersonalRecord:
+            json['supersetIsPersonalRecord'] as bool? ?? false,
       );
 
   ExerciseSetLog copy() => ExerciseSetLog(
@@ -54,6 +65,8 @@ class ExerciseSetLog {
         supersetReps: supersetReps,
         supersetTimeSeconds: supersetTimeSeconds,
         supersetWeightKg: supersetWeightKg,
+        isPersonalRecord: isPersonalRecord,
+        supersetIsPersonalRecord: supersetIsPersonalRecord,
       );
 }
 
@@ -103,6 +116,9 @@ class ExerciseCompletionLog {
       });
 
   int get completedSets => sets.where((s) => s.completed).length;
+
+  bool get hasPersonalRecord =>
+      sets.any((s) => s.isPersonalRecord || s.supersetIsPersonalRecord);
 
   double get totalVolume => sets.fold(0.0, (sum, s) {
         if (!s.completed) return sum;
@@ -206,6 +222,23 @@ class WorkoutLog {
 
   double get totalVolumeKg =>
       exerciseLogs.fold(0.0, (sum, e) => sum + e.totalVolume);
+
+  bool get hasPersonalRecord => exerciseLogs.any((e) => e.hasPersonalRecord);
+
+  List<String> get prExerciseNames {
+    final list = <String>[];
+    for (final e in exerciseLogs) {
+      if (e.sets.any((s) => s.isPersonalRecord)) {
+        list.add(e.exerciseName);
+      }
+      if (e.isSuperset &&
+          (e.supersetName?.isNotEmpty ?? false) &&
+          e.sets.any((s) => s.supersetIsPersonalRecord)) {
+        list.add(e.supersetName!);
+      }
+    }
+    return list;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/workout_schedule.dart';
 import '../models/workout_log.dart';
+import '../models/personal_record.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 
@@ -25,6 +26,9 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
   // Working state for each exercise's sets
   late List<ExerciseCompletionLog> _exerciseLogs;
   bool _isSaving = false;
+
+  final Map<String, ExerciseLastPerformance?> _lastPerformanceCache = {};
+  final Map<String, PersonalRecord> _prCache = {};
 
   TextEditingController _getWeightCtrl(int exIdx, int setIdx, double val) {
     final k = 'w_${exIdx}_$setIdx';
@@ -129,6 +133,176 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
         ),
       );
     }).toList();
+    _loadPerformanceAndPRs();
+  }
+
+  void _loadPerformanceAndPRs() {
+    final storage = StorageService();
+    for (final exercise in widget.schedule.exercises) {
+      final key = exercise.name.trim().toLowerCase();
+      _lastPerformanceCache[key] = storage.getLastPerformance(exercise.name);
+      _prCache[key] = storage.getPersonalRecord(exercise.name);
+
+      if (exercise.isSuperset && (exercise.supersetName?.isNotEmpty ?? false)) {
+        final sKey = exercise.supersetName!.trim().toLowerCase();
+        _lastPerformanceCache[sKey] =
+            storage.getLastPerformance(exercise.supersetName!);
+        _prCache[sKey] = storage.getPersonalRecord(exercise.supersetName!);
+      }
+    }
+  }
+
+  bool _isSetPR(String exName, double weight, int reps, int timeSeconds,
+      bool isTimeBased) {
+    final pr = _prCache[exName.trim().toLowerCase()];
+    if (pr == null || !pr.hasRecord) {
+      return isTimeBased ? timeSeconds > 0 : weight > 0;
+    }
+    if (isTimeBased) {
+      if (timeSeconds > pr.maxHoldSeconds) return true;
+      if (timeSeconds == pr.maxHoldSeconds && weight > pr.maxWeightKg) {
+        return true;
+      }
+      return false;
+    } else {
+      if (weight > pr.maxWeightKg) return true;
+      if (weight == pr.maxWeightKg && reps > pr.maxWeightReps) return true;
+      return false;
+    }
+  }
+
+  String? _formatLastSetText(String exName, int setIndex, bool isTimeBased) {
+    final lastPerf = _lastPerformanceCache[exName.trim().toLowerCase()];
+    if (lastPerf == null || lastPerf.sets.isEmpty) return null;
+
+    final set = lastPerf.getSet(setIndex) ?? lastPerf.sets.last;
+    if (isTimeBased) {
+      final t = set.timeSeconds;
+      final w = set.weightKg > 0
+          ? ' (+${set.weightKg % 1 == 0 ? set.weightKg.toInt() : set.weightKg}kg)'
+          : '';
+      return 'Last: ${t}s$w';
+    } else {
+      final w = set.weightKg % 1 == 0 ? set.weightKg.toInt() : set.weightKg;
+      return 'Last: ${w}kg × ${set.reps}';
+    }
+  }
+
+  String? _formatLastSuperSetText(
+      String superName, int setIndex, bool isTimeBased) {
+    final lastPerf = _lastPerformanceCache[superName.trim().toLowerCase()];
+    if (lastPerf == null || lastPerf.sets.isEmpty) return null;
+
+    final set = lastPerf.getSet(setIndex) ?? lastPerf.sets.last;
+    if (isTimeBased) {
+      final t = set.supersetTimeSeconds > 0
+          ? set.supersetTimeSeconds
+          : set.timeSeconds;
+      final w =
+          set.supersetWeightKg > 0 ? set.supersetWeightKg : set.weightKg;
+      final wStr = w > 0 ? ' (+${w % 1 == 0 ? w.toInt() : w}kg)' : '';
+      return 'Last: ${t}s$wStr';
+    } else {
+      final r = set.supersetReps > 0 ? set.supersetReps : set.reps;
+      final w =
+          set.supersetWeightKg > 0 ? set.supersetWeightKg : set.weightKg;
+      final wStr = w % 1 == 0 ? w.toInt() : w;
+      return 'Last: ${wStr}kg × $r';
+    }
+  }
+
+  Widget _buildExerciseHeaderStats(ExerciseCompletionLog exerciseLog) {
+    final lastPerf =
+        _lastPerformanceCache[exerciseLog.exerciseName.trim().toLowerCase()];
+    final pr = _prCache[exerciseLog.exerciseName.trim().toLowerCase()];
+
+    final hasLast = lastPerf != null && lastPerf.sets.isNotEmpty;
+    final hasPR = pr != null && pr.hasRecord;
+
+    if (!hasLast && !hasPR) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceHighlight.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Text(
+          '✨ First time tracking this exercise',
+          style: TextStyle(
+            fontSize: 10,
+            color: AppTheme.textMuted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    String? daysAgoText;
+    if (hasLast) {
+      final diffDays =
+          DateTime.now().difference(lastPerf.completedDate).inDays;
+      daysAgoText = diffDays == 0
+          ? 'today'
+          : diffDays == 1
+              ? 'yesterday'
+              : '${diffDays}d ago';
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        if (hasLast)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLighter,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.surfaceHighlight),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.history,
+                    size: 11, color: AppTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  'Last: ${lastPerf.sets.length} sets ($daysAgoText)',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (hasPR)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.emoji_events, size: 11, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(
+                  'PR: ${pr.formatSummary()}',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -215,6 +389,37 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
   Future<void> _saveWorkout() async {
     setState(() => _isSaving = true);
 
+    final newPRs = <String>[];
+    for (final ex in _exerciseLogs) {
+      bool exPR = false;
+      for (final s in ex.sets) {
+        if (!s.completed) continue;
+
+        if (_isSetPR(ex.exerciseName, s.weightKg, s.reps, s.timeSeconds,
+            ex.isTimeBased)) {
+          s.isPersonalRecord = true;
+          exPR = true;
+        }
+
+        if (ex.isSuperset && (ex.supersetName?.isNotEmpty ?? false)) {
+          if (_isSetPR(
+              ex.supersetName!,
+              s.supersetWeightKg,
+              s.supersetReps,
+              s.supersetTimeSeconds,
+              ex.supersetIsTimeBased)) {
+            s.supersetIsPersonalRecord = true;
+            if (!newPRs.contains(ex.supersetName!)) {
+              newPRs.add(ex.supersetName!);
+            }
+          }
+        }
+      }
+      if (exPR && !newPRs.contains(ex.exerciseName)) {
+        newPRs.add(ex.exerciseName);
+      }
+    }
+
     final log = WorkoutLog(
       id: const Uuid().v4(),
       scheduleId: widget.schedule.id,
@@ -229,18 +434,22 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
 
     if (!mounted) return;
 
+    final hasPR = newPRs.isNotEmpty;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: AppTheme.primary,
+        backgroundColor: hasPR ? Colors.amber[700]! : AppTheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.black),
+            Icon(hasPR ? Icons.emoji_events : Icons.check_circle,
+                color: Colors.black),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Logged "${widget.schedule.title}" successfully!',
+                hasPR
+                    ? '🏆 ${newPRs.length} New PR${newPRs.length > 1 ? "s" : ""} on ${newPRs.join(", ")}!'
+                    : 'Logged "${widget.schedule.title}" successfully!',
                 style: const TextStyle(
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
@@ -854,6 +1063,37 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     final tCtrl2 =
         _getSuperTimeCtrl(exerciseIndex, setIndex, set.supersetTimeSeconds);
 
+    final lastText1 = _formatLastSetText(
+      exerciseLog.exerciseName,
+      setIndex,
+      isTime1,
+    );
+    final lastText2 = exerciseLog.supersetName != null
+        ? _formatLastSuperSetText(
+            exerciseLog.supersetName!,
+            setIndex,
+            isTime2,
+          )
+        : null;
+
+    final isPR1 = set.completed &&
+        _isSetPR(
+          exerciseLog.exerciseName,
+          set.weightKg,
+          set.reps,
+          set.timeSeconds,
+          isTime1,
+        );
+    final isPR2 = set.completed &&
+        exerciseLog.supersetName != null &&
+        _isSetPR(
+          exerciseLog.supersetName!,
+          set.supersetWeightKg,
+          set.supersetReps,
+          set.supersetTimeSeconds,
+          isTime2,
+        );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       color: setIndex % 2 == 1
@@ -991,6 +1231,71 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                     ),
                   ],
                 ),
+                if (lastText1 != null || isPR1 || lastText2 != null || isPR2) ...[
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 3,
+                    children: [
+                      if (lastText1 != null)
+                        Text(
+                          '1: $lastText1',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textMuted,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      if (isPR1)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '1: PR!',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      if (lastText2 != null)
+                        Text(
+                          '2: $lastText2',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textMuted,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      if (isPR2)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '2: PR!',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -1188,6 +1493,8 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
                           ],
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      _buildExerciseHeaderStats(exerciseLog),
                     ],
                   ),
                 ),
@@ -1297,6 +1604,7 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
   }
 
   Widget _buildSetRow(int exerciseIndex, int setIndex, ExerciseSetLog set) {
+    final exerciseName = _exerciseLogs[exerciseIndex].exerciseName;
     final isTimeBased = _exerciseLogs[exerciseIndex].isTimeBased;
     final weightCtrl =
         _getWeightCtrl(exerciseIndex, setIndex, set.weightKg);
@@ -1304,10 +1612,23 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
     final timeCtrl =
         _getTimeCtrl(exerciseIndex, setIndex, set.timeSeconds);
 
+    final lastSetText = _formatLastSetText(exerciseName, setIndex, isTimeBased);
+    final isPR = set.completed &&
+        _isSetPR(
+          exerciseName,
+          set.weightKg,
+          set.reps,
+          set.timeSeconds,
+          isTimeBased,
+        );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
           // Set Badge
           SizedBox(
             width: 36,
@@ -1643,7 +1964,67 @@ class _LogSessionScreenState extends State<LogSessionScreen> {
           ),
         ],
       ),
-    );
+      if (lastSetText != null || isPR) ...[
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 42),
+          child: Row(
+            children: [
+              if (lastSetText != null) ...[
+                const Icon(Icons.history, size: 11, color: AppTheme.textMuted),
+                const SizedBox(width: 3),
+                Text(
+                  lastSetText,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+              if (isPR) ...[
+                if (lastSetText != null) const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.local_fire_department,
+                          size: 10, color: Colors.white),
+                      SizedBox(width: 2),
+                      Text(
+                        'NEW PR!',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ],
+  ),
+);
   }
 
   Widget _buildNotesCard() {

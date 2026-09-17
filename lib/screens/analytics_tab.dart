@@ -265,6 +265,113 @@ class AnalyticsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          // Personal Records Section
+          Row(
+            children: [
+              const Icon(Icons.emoji_events, size: 20, color: AppTheme.accentAmber),
+              const SizedBox(width: 8),
+              const Text(
+                'Personal Records (PR)',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${storage.getAllPersonalRecords().length} Records',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (storage.getAllPersonalRecords().isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceDark,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.surfaceHighlight),
+              ),
+              child: const Center(
+                child: Text(
+                  'No Personal Records yet. Log your first workout to establish baseline PRs!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                ),
+              ),
+            )
+          else
+            ...storage.getAllPersonalRecords().map((pr) {
+              final dateStr = pr.achievedDate != null
+                  ? DateFormat('MMM d, yyyy').format(pr.achievedDate!)
+                  : '';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceDark,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppTheme.accentAmber.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentAmber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.emoji_events,
+                        color: AppTheme.accentAmber,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pr.exerciseName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            pr.summary,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.accentAmber,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          const SizedBox(height: 24),
           // Top Routines Section
           const Text(
             'Most Practiced Routines',

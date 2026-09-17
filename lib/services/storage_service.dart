@@ -9,6 +9,7 @@ import '../models/exercise.dart';
 import '../models/workout_schedule.dart';
 import '../models/workout_log.dart';
 import '../models/user_profile.dart';
+import '../models/personal_record.dart';
 
 class SyncResult {
   final bool success;
@@ -510,6 +511,17 @@ class StorageService extends ChangeNotifier {
     return getLogs().where((l) => l.scheduleId == scheduleId).toList();
   }
 
+  /// Clears all logs locally (used for testing or resetting data)
+  Future<void> clearAllLogs() async {
+    await saveAllLogs([]);
+  }
+
+  /// Epley 1RM formula calculation
+  static double calculateEpley1RM(double weightKg, int reps) {
+    if (reps <= 1) return weightKg;
+    return weightKg * (1 + (reps / 30.0));
+  }
+
   // USER PROFILE & AI SETTINGS
   UserProfile getProfile() {
     final jsonStr = _prefs?.getString(_keyProfile);
@@ -528,5 +540,187 @@ class StorageService extends ChangeNotifier {
     final encoded = jsonEncode(profile.toJson());
     await _prefs?.setString(_keyProfile, encoded);
     notifyListeners();
+  }
+
+  // PERSONAL RECORDS & HISTORICAL PERFORMANCE
+
+  /// Retrieves the most recent previous performance for a given exercise name.
+  ExerciseLastPerformance? getLastPerformance(String exerciseName) {
+    final cleanName = exerciseName.trim().toLowerCase();
+    if (cleanName.isEmpty) return null;
+
+    final logs = getLogs();
+    for (final log in logs) {
+      for (final ex in log.exerciseLogs) {
+        final matchesPrimary = ex.exerciseName.trim().toLowerCase() == cleanName;
+        final matchesSuper = ex.isSuperset &&
+            (ex.supersetName?.trim().toLowerCase() == cleanName);
+
+        if (matchesPrimary || matchesSuper) {
+          final setPerformances = ex.sets.where((s) => s.completed).map((s) {
+            return ExerciseSetPerformance(
+              setNumber: s.setNumber,
+              reps: s.reps,
+              timeSeconds: s.timeSeconds,
+              weightKg: s.weightKg,
+              supersetReps: s.supersetReps,
+              supersetTimeSeconds: s.supersetTimeSeconds,
+              supersetWeightKg: s.supersetWeightKg,
+              isTimeBased: ex.isTimeBased,
+              supersetIsTimeBased: ex.supersetIsTimeBased,
+            );
+          }).toList();
+
+          if (setPerformances.isNotEmpty) {
+            return ExerciseLastPerformance(
+              exerciseName: ex.exerciseName,
+              completedDate: log.completedDate,
+              routineTitle: log.scheduleTitle,
+              sets: setPerformances,
+              isSuperset: ex.isSuperset,
+              supersetName: ex.supersetName,
+            );
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Calculates the all-time personal record (Max Weight, 1RM, Hold time) for an exercise.
+  PersonalRecord getPersonalRecord(String exerciseName) {
+    final cleanName = exerciseName.trim().toLowerCase();
+    final logs = getLogs();
+
+    double maxWeight = 0.0;
+    int maxWeightReps = 0;
+    int maxHoldSeconds = 0;
+    double maxEstimated1RM = 0.0;
+    DateTime? recordDate;
+    bool isTimeBased = false;
+
+    for (final log in logs) {
+      for (final ex in log.exerciseLogs) {
+        if (ex.exerciseName.trim().toLowerCase() == cleanName) {
+          isTimeBased = ex.isTimeBased;
+          for (final s in ex.sets) {
+            if (!s.completed) continue;
+
+            if (ex.isTimeBased) {
+              if (s.timeSeconds > maxHoldSeconds ||
+                  (s.timeSeconds == maxHoldSeconds && s.weightKg > maxWeight)) {
+                maxHoldSeconds = s.timeSeconds;
+                maxWeight = s.weightKg;
+                recordDate = log.completedDate;
+              }
+            } else {
+              // Epley 1RM formula: weight * (1 + reps / 30)
+              final epley1RM = s.reps > 1 ? s.weightKg * (1 + (s.reps / 30.0)) : s.weightKg;
+
+              if (s.weightKg > maxWeight || (s.weightKg == maxWeight && s.reps > maxWeightReps)) {
+                maxWeight = s.weightKg;
+                maxWeightReps = s.reps;
+                recordDate = log.completedDate;
+              }
+
+              if (epley1RM > maxEstimated1RM) {
+                maxEstimated1RM = epley1RM;
+              }
+            }
+          }
+        } else if (ex.isSuperset && ex.supersetName?.trim().toLowerCase() == cleanName) {
+          isTimeBased = ex.supersetIsTimeBased;
+          for (final s in ex.sets) {
+            if (!s.completed) continue;
+
+            if (ex.supersetIsTimeBased) {
+              if (s.supersetTimeSeconds > maxHoldSeconds ||
+                  (s.supersetTimeSeconds == maxHoldSeconds && s.supersetWeightKg > maxWeight)) {
+                maxHoldSeconds = s.supersetTimeSeconds;
+                maxWeight = s.supersetWeightKg;
+                recordDate = log.completedDate;
+              }
+            } else {
+              final epley1RM = s.supersetReps > 1
+                  ? s.supersetWeightKg * (1 + (s.supersetReps / 30.0))
+                  : s.supersetWeightKg;
+
+              if (s.supersetWeightKg > maxWeight ||
+                  (s.supersetWeightKg == maxWeight && s.supersetReps > maxWeightReps)) {
+                maxWeight = s.supersetWeightKg;
+                maxWeightReps = s.supersetReps;
+                recordDate = log.completedDate;
+              }
+
+              if (epley1RM > maxEstimated1RM) {
+                maxEstimated1RM = epley1RM;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return PersonalRecord(
+      exerciseName: exerciseName,
+      maxWeightKg: maxWeight,
+      maxWeightReps: maxWeightReps,
+      maxHoldSeconds: maxHoldSeconds,
+      estimated1RM: maxEstimated1RM > 0 ? maxEstimated1RM : maxWeight,
+      achievedDate: recordDate,
+      isTimeBased: isTimeBased,
+    );
+  }
+
+  /// Checks if a current set achieves a new personal record.
+  bool checkIsNewPR({
+    required String exerciseName,
+    required double weightKg,
+    required int reps,
+    required int timeSeconds,
+    required bool isTimeBased,
+  }) {
+    final existingPR = getPersonalRecord(exerciseName);
+    if (!existingPR.hasRecord) {
+      return isTimeBased ? timeSeconds > 0 : weightKg > 0;
+    }
+
+    if (isTimeBased) {
+      if (timeSeconds > existingPR.maxHoldSeconds) return true;
+      if (timeSeconds == existingPR.maxHoldSeconds && weightKg > existingPR.maxWeightKg) {
+        return true;
+      }
+      return false;
+    } else {
+      if (weightKg > existingPR.maxWeightKg) return true;
+      if (weightKg == existingPR.maxWeightKg && reps > existingPR.maxWeightReps) {
+        return true;
+      }
+      return false;
+    }
+  }
+
+  /// Returns personal records for all recorded exercises.
+  List<PersonalRecord> getAllPersonalRecords() {
+    final logs = getLogs();
+    final exerciseNames = <String>{};
+    for (final log in logs) {
+      for (final ex in log.exerciseLogs) {
+        if (ex.exerciseName.trim().isNotEmpty) {
+          exerciseNames.add(ex.exerciseName.trim());
+        }
+        if (ex.isSuperset && (ex.supersetName?.trim().isNotEmpty ?? false)) {
+          exerciseNames.add(ex.supersetName!.trim());
+        }
+      }
+    }
+
+    final records = exerciseNames
+        .map((name) => getPersonalRecord(name))
+        .where((pr) => pr.hasRecord)
+        .toList();
+
+    records.sort((a, b) => b.maxWeightKg.compareTo(a.maxWeightKg));
+    return records;
   }
 }
